@@ -42,11 +42,11 @@ import java.util.function.Supplier;
  * multi-threaded promise event loop.
  *
  * The guarantees of these promises can be interpreted as follows:
- *   - Operations in a promise are NOT guaranteed to be executed after the
- *     call to create them. They may be executed inline, asynchronously, or
- *     fully after the call has completed.
- *   - Chained promises are guaranteed to be executed in order and receive the
- *     result of the previous operation.
+ * - Operations in a promise are NOT guaranteed to be executed after the
+ * call to create them. They may be executed inline, asynchronously, or
+ * fully after the call has completed.
+ * - Chained promises are guaranteed to be executed in order and receive the
+ * result of the previous operation.
  */
 @NotThreadSafe
 public abstract class Promise<V> {
@@ -129,6 +129,7 @@ public abstract class Promise<V> {
         private static final Promise<Void> DONE = new Precomputed<>(null);
 
         private final V value;
+
         Precomputed(V value) {
             this.value = value;
         }
