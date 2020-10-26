@@ -21,3 +21,17 @@ java_binary(
     srcs = glob(["*.java"]),
     deps = ["//:common"],
 )
+
+java_binary(
+    name = "cooperative-looping",
+    main_class = "grakn.common.poc.CooperativeTest",
+    srcs = ["MockTransaction.java", "CooperativeTest.java"],
+    deps = ["//:common"],
+)
+
+java_binary(
+    name = "noncooperative-looping",
+    main_class = "grakn.common.poc.NonCooperativeTest",
+    srcs = ["MockTransaction.java", "NonCooperativeTest.java"],
+    deps = ["//:common"],
+)
