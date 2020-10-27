@@ -16,9 +16,9 @@
 #
 
 java_binary(
-    name = "reasoner-poc",
-    main_class = "grakn.common.poc.ReasoningPOC",
-    srcs = glob(["*.java"]),
+    name = "backpressure-poc",
+    main_class = "grakn.common.poc.BackpressurePOC",
+    srcs = ["MockTransaction.java", "BackpressurePOC.java"],
     deps = ["//:common"],
 )
 

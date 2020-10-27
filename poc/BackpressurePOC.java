@@ -6,45 +6,146 @@ import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static grakn.common.poc.BackpressurePOC.NUM_VALUES;
+import static grakn.common.poc.BackpressurePOC.pressuredActors;
+
 
 public class BackpressurePOC {
+
+    static List<Actor<BackpressureActor>> pressuredActors;
+
+    static int NUM_VALUES = 1;
 
     public static void main(String[] args) throws InterruptedException {
         EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(BackpressurePOC.class, "main"));
         ArrayList<Long> output = new ArrayList<>();
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
-        Actor<ControllerActor> controller = rootActor.ask(root -> root.<ControllerActor>createActor((self) -> new ControllerActor(self, output))).await();
-        controller.tell((actor) -> actor.start());
+        pressuredActors = new ArrayList<>();
+        Actor<BackpressureActor> start = rootActor.ask(root -> root.<BackpressureActor>createActor((self) -> new BackpressureActor(self, null))).await();
+        pressuredActors.add(start);
+        for (int i = 0; i < 10000; i++) {
+            Actor<BackpressureActor> child = pressuredActors.get(pressuredActors.size() - 1).ask((actor) -> actor.child()).await();
+            pressuredActors.add(child);
+        }
+
+        Actor<BackpressureActor> last = pressuredActors.get(pressuredActors.size() - 1);
+        for (int i = 0; i < NUM_VALUES; i++) {
+            last.tell((actor) -> actor.pull());
+        }
+        Thread.sleep(1000);
     }
 }
 
-class ControllerActor extends Actor.State<ControllerActor> {
 
-    ArrayList<Long> buffer;
+class BackpressureActor extends Actor.State<BackpressureActor> {
 
-    protected ControllerActor(final Actor<ControllerActor> self, final ArrayList<Long> output) {
+    // set of actors that can be pulled from
+    Set<Actor<BackpressureActor>> senders = new HashSet<>();
+    // a queue per receiver of answers from this actor
+    Map<Actor<BackpressureActor>, List<Runnable>> outbox = new HashMap<>();
+    Map<Actor<BackpressureActor>, Integer> awaitingPush = new HashMap<>();
+    // when a given outbox has less than this threshold, we initialise a new pull
+    static int PULL_THRESHOLD = 2;
+
+    List<Long> terminus = new ArrayList<>();
+
+    // only for final or first actor
+    MockTransaction tx;
+    Iterator<Long> query;
+    long startTime;
+
+    protected BackpressureActor(final Actor<BackpressureActor> self, final Actor<BackpressureActor> prior) {
         super(self);
+        if (prior == null) {
+            tx = new MockTransaction(BackpressurePOC.NUM_VALUES, 1);
+            query = tx.query();
+        } else {
+            senders.add(prior);
+        }
     }
 
     public Actor<BackpressureActor> child() {
         return this.<BackpressureActor>child((actor) -> new BackpressureActor(actor, self()));
     }
 
-    public void receive(Long l) {
-        buffer.add(l);
+    /*
+    Another actor can pull answers from this actor
+     */
+    public void pull(Actor<BackpressureActor> receiver) {
+        outbox.putIfAbsent(receiver, new LinkedList<>());
+        List<Runnable> receiverOutbox = outbox.get(receiver);
+        awaitingPush.putIfAbsent(receiver, 0);
+
+        if (receiverOutbox.size() < PULL_THRESHOLD) {
+            pullFromSenders();
+            awaitingPush.compute(receiver, (key, value) -> value + 1);
+        } else {
+            // TODO this UX can be improved, not obvious this is doing a tell()
+            receiverOutbox.remove(0).run();
+        }
     }
-}
 
-class BackpressureActor extends Actor.State<BackpressureActor> {
-
-    private final Actor<ControllerActor> contoller;
-
-    protected BackpressureActor(final Actor<BackpressureActor> self, Actor<ControllerActor> contoller) {
-        super(self);
-        this.contoller = contoller;
+    // if you're the last actor, just pull from it
+    public void pull() {
+        startTime = System.currentTimeMillis();
+        if (terminus.size() < PULL_THRESHOLD) {
+            pullFromSenders();
+        } else {
+            System.out.println("Got value 2: " + terminus.remove(0));
+        }
     }
 
-    public Actor<BackpressureActor> child() {
-        return this.<BackpressureActor>child((actor) -> new BackpressureActor(actor, contoller));
+    private void pullFromSenders() {
+        if (senders.size() > 0) {
+            for (Actor<BackpressureActor> sender : senders) {
+                sender.tell((actor) -> actor.pull(self()));
+            }
+        } else {
+            // send next value to all outbox
+            if (query.hasNext()) {
+                Long nextValue = query.next();
+                for (Actor<BackpressureActor> receiver : outbox.keySet()) {
+                    // top level message must visit all actors downstream
+                    receiver.tell((actor) -> actor.partialAnswer(nextValue, self(), BackpressurePOC.pressuredActors.subList(2, pressuredActors.size())));
+                }
+            }
+        }
+    }
+
+    public void partialAnswer(Long l, Actor<BackpressureActor> sender, List<Actor<BackpressureActor>> toVisit) {
+        senders.add(sender);
+        if (toVisit.isEmpty()) {
+                terminus.add(l);
+
+//            System.out.println("Got value: " + l + ", elapsed: " + (System.currentTimeMillis() - startTime));
+            if (terminus.size() == NUM_VALUES) {
+                System.out.println("Got " + terminus.size() + " values in " + (System.currentTimeMillis() - startTime) + " milliseconds");
+            }
+
+
+        } else {
+            Actor<BackpressureActor> next = toVisit.get(0);
+            ArrayList<Actor<BackpressureActor>> nextToVisit = new ArrayList<>(toVisit.subList(1, toVisit.size()));
+            push(l, nextToVisit, next);
+        }
+    }
+
+    private void push(Long l, List<Actor<BackpressureActor>> nextToVisit, Actor<BackpressureActor> receiver) {
+        // pass it through into the outbox if there is no active push request
+        Integer receiverAwaiting = awaitingPush.get(receiver);
+        if (receiverAwaiting > 0) {
+            receiver.tell((actor) -> actor.partialAnswer(l, self(), nextToVisit));
+            awaitingPush.compute(receiver, (key, value) -> value - 1);
+        } else {
+            outbox.get(receiver).add(() -> receiver.tell((actor) -> actor.partialAnswer(l, self(), nextToVisit)));
+        }
     }
 }
