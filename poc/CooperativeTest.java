@@ -8,6 +8,11 @@ import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+/**
+ * Test performance and UX of incrementally computing a a job
+ * The minimal packet of a job before it can be split up is one output of the source "iterator",
+ * whatever that is. For instance, in Grakn it can be a query traversal.
+ */
 public class CooperativeTest {
 
     public static void main(String[] args) throws InterruptedException {
