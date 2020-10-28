@@ -22,7 +22,7 @@ public class BackpressurePOC {
 
     static List<Actor<BackpressureActor>> pressuredActors;
 
-    static int NUM_VALUES = 1;
+    static int NUM_VALUES = 1000;
 
     public static void main(String[] args) throws InterruptedException {
         EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(BackpressurePOC.class, "main"));
@@ -31,14 +31,15 @@ public class BackpressurePOC {
         pressuredActors = new ArrayList<>();
         Actor<BackpressureActor> start = rootActor.ask(root -> root.<BackpressureActor>createActor((self) -> new BackpressureActor(self, null))).await();
         pressuredActors.add(start);
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 1000; i++) {
             Actor<BackpressureActor> child = pressuredActors.get(pressuredActors.size() - 1).ask((actor) -> actor.child()).await();
             pressuredActors.add(child);
         }
 
         Actor<BackpressureActor> last = pressuredActors.get(pressuredActors.size() - 1);
-        for (int i = 0; i < NUM_VALUES; i++) {
-            last.tell((actor) -> actor.pull());
+        int batch = 2;
+        for (int i = 0; i < NUM_VALUES / batch; i++) {
+            last.tell((actor) -> actor.pull(batch));
         }
         Thread.sleep(1000);
     }
@@ -79,14 +80,14 @@ class BackpressureActor extends Actor.State<BackpressureActor> {
     /*
     Another actor can pull answers from this actor
      */
-    public void pull(Actor<BackpressureActor> receiver) {
+    public void pull(Actor<BackpressureActor> receiver, int size) {
         outbox.putIfAbsent(receiver, new LinkedList<>());
         List<Runnable> receiverOutbox = outbox.get(receiver);
         awaitingPush.putIfAbsent(receiver, 0);
 
         if (receiverOutbox.size() < PULL_THRESHOLD) {
-            pullFromSenders();
-            awaitingPush.compute(receiver, (key, value) -> value + 1);
+            pullFromSenders(Math.max(PULL_THRESHOLD, size));
+            awaitingPush.compute(receiver, (key, value) -> value + size);
         } else {
             // TODO this UX can be improved, not obvious this is doing a tell()
             receiverOutbox.remove(0).run();
@@ -94,28 +95,30 @@ class BackpressureActor extends Actor.State<BackpressureActor> {
     }
 
     // if you're the last actor, just pull from it
-    public void pull() {
+    public void pull(int size) {
         startTime = System.currentTimeMillis();
         if (terminus.size() < PULL_THRESHOLD) {
-            pullFromSenders();
+            pullFromSenders(size);
         } else {
             System.out.println("Got value 2: " + terminus.remove(0));
         }
     }
 
-    private void pullFromSenders() {
+    private void pullFromSenders(int size) {
         if (senders.size() > 0) {
             for (Actor<BackpressureActor> sender : senders) {
-                sender.tell((actor) -> actor.pull(self()));
+                sender.tell((actor) -> actor.pull(self(), size));
             }
         } else {
             // send next value to all outbox
-            if (query.hasNext()) {
+            int count = 0;
+            while (query.hasNext() && count < size) {
                 Long nextValue = query.next();
                 for (Actor<BackpressureActor> receiver : outbox.keySet()) {
                     // top level message must visit all actors downstream
                     receiver.tell((actor) -> actor.partialAnswer(nextValue, self(), BackpressurePOC.pressuredActors.subList(2, pressuredActors.size())));
                 }
+                count++;
             }
         }
     }
@@ -123,7 +126,7 @@ class BackpressureActor extends Actor.State<BackpressureActor> {
     public void partialAnswer(Long l, Actor<BackpressureActor> sender, List<Actor<BackpressureActor>> toVisit) {
         senders.add(sender);
         if (toVisit.isEmpty()) {
-                terminus.add(l);
+            terminus.add(l);
 
 //            System.out.println("Got value: " + l + ", elapsed: " + (System.currentTimeMillis() - startTime));
             if (terminus.size() == NUM_VALUES) {
