@@ -41,10 +41,6 @@ class AtomicActor extends Actor.State<AtomicActor> {
             enqueueAnswers(request, responseProducer, answers);
         }
 
-        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
-            dispatchRuleRequests(request, responseProducer);
-        }
-
         if (responseProducer.finished()) dispatchResponseDone(request);
     }
 
@@ -64,27 +60,6 @@ class AtomicActor extends Actor.State<AtomicActor> {
     private void enqueueAnswers(final Request request, final ResponseProducer responseProducer, final List<Long> answers) {
         responseProducer.answers.addAll(answers);
         dispatchResponseAnswers(request, responseProducer);
-    }
-
-    private void dispatchRuleRequests(final Request request, final ResponseProducer responseProducer) {
-        List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath.size() + 1);
-        returnPath.addAll(request.returnPath);
-        returnPath.add(self());
-
-        for (Actor<RuleActor> ruleActor : responseProducer.ruleProducers) {
-            // request the next answer from the rule actor
-            Request nextAnswerRequest = new Request(
-                    new ArrayList<>(returnPath),
-                    request.gotoPath,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers,
-                    ruleActor
-            );
-
-            ruleActor.tell((actor) -> actor.receiveRequest(nextAnswerRequest));
-            responseProducer.dispatched++;
-        }
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
@@ -119,11 +94,6 @@ class AtomicActor extends Actor.State<AtomicActor> {
         }
     }
 
-    private List<Actor<RuleActor>> getApplicableRuleActors(final Request request) {
-        // TODO find some applicable rules
-        return Arrays.asList();
-    }
-
     private void dispatchResponseDone(final Request request) {
         Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
         ResponseDone responseDone = new ResponseDone(request);
@@ -135,71 +105,22 @@ class AtomicActor extends Actor.State<AtomicActor> {
         // initialise traversal
         Iterator<Long> traversal = (new MockTransaction(10, 1)).query();
         // initialise downstream producers
-        List<Actor<RuleActor>> ruleProducers = getApplicableRuleActors(request);
-        return new ResponseProducer(traversal, ruleProducers);
+        return new ResponseProducer(traversal);
     }
 }
-
-class RuleActor extends Actor.State<RuleActor> {
-
-    // Rule TODOs can be simpler
-    private Map<Request, ResponseProducer> responseProducers;
-
-    protected RuleActor(final Actor<RuleActor> self) {
-        super(self);
-    }
-
-    public void receiveRequest(Request request) {
-
-    }
-
-    public void receiveAnswer(ResponseAnswer answer) {
-
-    }
-
-    public void receiveDone(ResponseDone done) {
-
-    }
-}
-
 
 class ResponseProducer {
     Iterator<Long> traversalProducer;
-    List<Actor<RuleActor>> ruleProducers;
     List<Long> answers = new LinkedList<>();
     int requested = 0;
     int dispatched = 0;
 
-    public ResponseProducer(Iterator<Long> traversalProducer, List<Actor<RuleActor>> ruleProducers) {
+    public ResponseProducer(Iterator<Long> traversalProducer) {
         this.traversalProducer = traversalProducer;
-        this.ruleProducers = ruleProducers;
-    }
-
-    public boolean isRuleProducerDone(ResumeRule rule) {
-        return ruleProducers.contains(rule);
-    }
-
-    public void ruleProducerDone(ResumeRule rule) {
-        ruleProducers.remove(rule);
-    }
-
-    public void traversalDone(ResumeTraversal resume) {
-        ruleProducers.remove(resume);
     }
 
     public boolean finished() {
-        return ruleProducers.isEmpty() && !traversalProducer.hasNext();
-    }
-}
-
-
-class ResumeRule {
-    Request source;
-    Actor<RuleActor> ruleActor;
-
-    public ResumeRule(Request source, Actor<RuleActor> ruleActor) {
-        this.source = source;
-        this.ruleActor = ruleActor;
+        return !traversalProducer.hasNext();
     }
 }
 
@@ -214,21 +135,18 @@ class Request {
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
-    Actor<RuleActor> requester;
 
     public Request(List<Actor<AtomicActor>> returnPath,
                    List<Actor<AtomicActor>> gotoPath,
                    List<Long> partialAnswers,
                    List<Object> constraints,
-                   List<Object> unifiers,
-                   Actor<RuleActor> localRequester) {
+                   List<Object> unifiers) {
 
         this.returnPath = returnPath;
         this.gotoPath = gotoPath;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
-        this.requester = localRequester;
     }
 }
 
