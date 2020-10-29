@@ -77,14 +77,24 @@ class AtomicActor extends Actor.State<AtomicActor> {
         }
     }
 
-
     private List<Actor<RuleActor>> getApplicableRuleActors(final NextMessage request) {
         // TODO find some applicable rules
         return Arrays.asList();
     }
 
     public void done(DoneMessage done) {
+        NextMessage request = done.request();
+        Todos todo = todos.get(request);
 
+        if (todo.finished()) {
+            dispatchDone(request);
+        }
+    }
+
+    private void dispatchDone(final NextMessage request) {
+        Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
+        DoneMessage doneMessage = new DoneMessage(request);
+        requester.tell((actor) -> actor.done(doneMessage));
     }
 
     public void answer(AnswerMessage answer) {
@@ -104,9 +114,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         }
 
         if (todo.finished()) {
-            Actor<AtomicActor> requester = source.returnPath.get(source.returnPath.size() - 1);
-            DoneMessage doneMessage = new DoneMessage(source);
-            requester.tell((actor) -> actor.done(doneMessage));
+            dispatchDone(source);
         }
     }
 
@@ -125,11 +133,13 @@ class AtomicActor extends Actor.State<AtomicActor> {
                     source.gotoPath,
                     source.partialAnswers,
                     source.constraints,
-                    source.unifiers
+                    source.unifiers,
+                    resumeRule
             );
 
             ruleActor.tell((actor) -> actor.next(request));
         }
+
     }
 }
 
@@ -216,18 +226,21 @@ class NextMessage implements Request {
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
+    ResumeLocalProducer localRequester;
 
     public NextMessage(List<Actor<AtomicActor>> returnPath,
                        List<Actor<AtomicActor>> gotoPath,
                        List<Long> partialAnswers,
                        List<Object> constraints,
-                       List<Object> unifiers) {
+                       List<Object> unifiers,
+                       ResumeLocalProducer localRequester) {
 
         this.returnPath = returnPath;
         this.gotoPath = gotoPath;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
+        this.localRequester = localRequester;
     }
 }
 
