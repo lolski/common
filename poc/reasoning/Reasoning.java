@@ -29,19 +29,26 @@ class AtomicActor extends Actor.State<AtomicActor> {
         responseProducers = new HashMap<>();
     }
 
-    public void request(Request request) {
-        if (!responseProducers.containsKey(request)) {
-            responseProducers.put(request, createResponseProducer(request));
-        }
-        ResponseProducer responseProducer = responseProducers.get(request);
+    public void receiveRequest(Request request) {
+        if (!responseProducers.containsKey(request)) responseProducers.put(request, createResponseProducer(request));
 
+        ResponseProducer responseProducer = responseProducers.get(request);
         // TODO if we want batching, we increment by as many as are requested
         responseProducer.requested++;
 
-        process(request);
+        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
+            List<Long> answers = produceTraversalAnswers(responseProducer);
+            enqueueAnswers(request, responseProducer, answers);
+        }
+
+        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
+            dispatchRuleRequests(request, responseProducer);
+        }
+
+        if (responseProducer.finished()) dispatchResponseDone(request);
     }
 
-    public void responseDone(ResponseDone done) {
+    public void receiveDone(ResponseDone done) {
         Request request = done.request();
         ResponseProducer responseProducer = responseProducers.get(request);
 
@@ -50,75 +57,44 @@ class AtomicActor extends Actor.State<AtomicActor> {
         }
     }
 
-    public void responseAnswer(ResponseAnswer answer) {
+    public void receiveAnswer(ResponseAnswer answer) {
 
     }
 
-    private void resumeTraversal(ResumeTraversal resumeTraversal) {
-        Request source = resumeTraversal.source;
-        ResponseProducer responseProducer = this.responseProducers.get(source);
-
+    private void enqueueAnswers(final Request request, final ResponseProducer responseProducer, final List<Long> answers) {
+        responseProducer.answers.addAll(answers);
+        dispatchResponseAnswers(request, responseProducer);
     }
 
-    private void resumeRule(ResumeRule resumeRule) {
-        Request source = resumeRule.source;
-        ResponseProducer responseProducer = this.responseProducers.get(source);
-        if (!responseProducer.isRuleProducerDone(resumeRule)) {
-            Actor<RuleActor> ruleActor = resumeRule.ruleActor;
+    private void dispatchRuleRequests(final Request request, final ResponseProducer responseProducer) {
+        for (Actor<RuleActor> ruleActor : responseProducer.ruleProducers) {
             // request the next answer from the rule actor
-            List<Actor<AtomicActor>> returnPath = new ArrayList<>(source.returnPath.size() + 1);
-            returnPath.addAll(source.returnPath);
+            List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath.size() + 1);
+            returnPath.addAll(request.returnPath);
             returnPath.add(self());
 
-            Request request = new Request(
+            Request nextAnswerRequest = new Request(
                     returnPath,
-                    source.gotoPath,
-                    source.partialAnswers,
-                    source.constraints,
-                    source.unifiers,
-                    resumeRule
+                    request.gotoPath,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers,
+                    ruleActor
             );
 
-            ruleActor.tell((actor) -> actor.next(request));
-        }
-
-    }
-
-    private void process(Request request) {
-        ResponseProducer responseProducer = responseProducers.get(request);
-        dispatchResponseAnswers(request, responseProducer);
-
-        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
-            produceTraversalAnswers(responseProducer);
-        }
-
-        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
-            dispatchRuleRequests(responseProducer);
-        }
-
-        dispatchResponseAnswers(request, responseProducer);
-
-        if (responseProducer.finished()) {
-            dispatchResponseDone(request);
-        }
-    }
-
-    private void dispatchRuleRequests(final ResponseProducer responseProducer) {
-        for (Actor<RuleActor> ruleActor : responseProducer.ruleProducers) {
-            // TODO fill in REQUEST
-            Request nextAnswerRequest = null;
-            ruleActor.tell((actor) -> actor.request(nextAnswerRequest));
+            ruleActor.tell((actor) -> actor.receiveRequest(nextAnswerRequest));
             responseProducer.dispatched++;
         }
     }
 
-    private void produceTraversalAnswers(final ResponseProducer responseProducer) {
-        // choose some strategy to answer the request
+    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
         if (responseProducer.traversalProducer.hasNext()) {
+            // TODO could batch traverse here
             Long answer = responseProducer.traversalProducer.next();
             answer += this.queryPattern;
-            responseProducer.answers.add(answer);
+            return Arrays.asList(answer);
         }
+        return Arrays.asList();
     }
 
     private void dispatchResponseAnswers(final Request request, final ResponseProducer responseProducer) {
@@ -139,7 +115,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
                     request.unifiers
             );
 
-            requester.tell((actor) -> actor.responseAnswer(responseAnswer));
+            requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
         }
     }
 
@@ -151,7 +127,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
     private void dispatchResponseDone(final Request request) {
         Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
         ResponseDone responseDone = new ResponseDone(request);
-        requester.tell((actor) -> actor.responseDone(responseDone));
+        requester.tell((actor) -> actor.receiveDone(responseDone));
     }
 
 
@@ -173,15 +149,15 @@ class RuleActor extends Actor.State<RuleActor> {
         super(self);
     }
 
-    public void request(Request request) {
+    public void receiveRequest(Request request) {
 
     }
 
-    public void answer(ResponseAnswer answer) {
+    public void receiveAnswer(ResponseAnswer answer) {
 
     }
 
-    public void done(ResponseDone done) {
+    public void receiveDone(ResponseDone done) {
 
     }
 }
@@ -238,21 +214,21 @@ class Request {
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
-    ResumeLocalProducer localRequester;
+    Actor<RuleActor> requester;
 
     public Request(List<Actor<AtomicActor>> returnPath,
                    List<Actor<AtomicActor>> gotoPath,
                    List<Long> partialAnswers,
                    List<Object> constraints,
                    List<Object> unifiers,
-                   ResumeLocalProducer localRequester) {
+                   Actor<RuleActor> localRequester) {
 
         this.returnPath = returnPath;
         this.gotoPath = gotoPath;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
-        this.localRequester = localRequester;
+        this.requester = localRequester;
     }
 }
 
