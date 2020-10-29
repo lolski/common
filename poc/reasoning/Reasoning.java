@@ -19,8 +19,8 @@ public class Reasoning {
 
 class AtomicActor extends Actor.State<AtomicActor> {
 
-    private Map<Request, ResponseProducer> responseProducers;
-    private Long queryPattern;
+    private final Map<Request, ResponseProducer> responseProducers;
+    private final Long queryPattern;
 
     public AtomicActor(final Actor<AtomicActor> self, Long queryPattern) {
         super(self);
@@ -67,14 +67,14 @@ class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private void dispatchRuleRequests(final Request request, final ResponseProducer responseProducer) {
+        List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath.size() + 1);
+        returnPath.addAll(request.returnPath);
+        returnPath.add(self());
+
         for (Actor<RuleActor> ruleActor : responseProducer.ruleProducers) {
             // request the next answer from the rule actor
-            List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath.size() + 1);
-            returnPath.addAll(request.returnPath);
-            returnPath.add(self());
-
             Request nextAnswerRequest = new Request(
-                    returnPath,
+                    new ArrayList<>(returnPath),
                     request.gotoPath,
                     request.partialAnswers,
                     request.constraints,
