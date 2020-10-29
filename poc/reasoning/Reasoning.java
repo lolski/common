@@ -1,6 +1,5 @@
 package grakn.common.poc.reasoning;
 
-import grakn.common.collection.Pair;
 import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class Reasoning {
     public static LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
@@ -24,18 +22,20 @@ public class Reasoning {
     public static void main(String[] args) throws InterruptedException {
         EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
-        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 1L))).await();
+        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 50L))).await();
+        Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, -100L))).await();
+
         atomic.tell(actor ->
                 actor.receiveRequest(
-                        new Request(Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList())
-                )
-        );
-        atomic.tell(actor ->
-                actor.receiveRequest(
-                        new Request(Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                        new Request(Arrays.asList(), Arrays.asList(subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
                 )
         );
         System.out.println(answers.take());
+        atomic.tell(actor ->
+                actor.receiveRequest(
+                        new Request(Arrays.asList(), Arrays.asList(subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                )
+        );
         System.out.println(answers.take());
         System.out.println(answers.take());
         System.out.println("should not be printed");
@@ -70,29 +70,29 @@ class AtomicActor extends Actor.State<AtomicActor> {
             enqueueAnswers(request, responseProducer, answers);
         }
 
-        requestFromDependency(request, responseProducer);
+        if (responseProducer.dependency != null) {
+            requestFromDependency(request, responseProducer);
+        }
 
         if (responseProducer.finished()) dispatchResponseDone(request);
     }
 
     private void requestFromDependency(final Request request, final ResponseProducer responseProducer) {
         Actor<AtomicActor> dependency = responseProducer.dependency;
-        if (dependency != null) {
-            List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath);
-            returnPath.add(self());
-            Request subrequest = new Request(
-                    returnPath,
-                    new ArrayList<>(request.gotoPath.subList(0, request.gotoPath.size() - 1)),
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
+        List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath);
+        returnPath.add(self());
+        Request subrequest = new Request(
+                returnPath,
+                new ArrayList<>(request.gotoPath.subList(0, request.gotoPath.size() - 1)),
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers
+        );
 
-            // TODO we may overwrite if multiple identical requests are sent
-            subrequests.put(subrequest, request);
+        // TODO we may overwrite if multiple identical requests are sent
+        subrequests.put(subrequest, request);
 
-            dependency.tell(actor -> actor.receiveRequest(subrequest));
-        }
+        dependency.tell(actor -> actor.receiveRequest(subrequest));
     }
 
     public void receiveDone(ResponseDone done) {
@@ -109,10 +109,22 @@ class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     public void receiveAnswer(ResponseAnswer answer) {
+        Request sourceSubRequest = answer.request();
+        Request parentRequest = subrequests.get(sourceSubRequest);
+        ResponseProducer responseProducer = requests.get(parentRequest);
 
+        List<Long> partialAnswers = answer.partialAnswers;
+        Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
+
+        Iterator<Long> traversal = (new MockTransaction(2, 1)).query(mergedAnswers);
+        responseProducer.addTraversalProducer(traversal);
+
+        List<Long> answers = produceTraversalAnswers(responseProducer);
+        enqueueAnswers(parentRequest, responseProducer, answers);
     }
 
     private void enqueueAnswers(final Request request, final ResponseProducer responseProducer, final List<Long> answers) {
+        System.out.println(answers);
         responseProducer.answers.addAll(answers);
         dispatchResponseAnswers(request, responseProducer);
     }
@@ -144,7 +156,6 @@ class AtomicActor extends Actor.State<AtomicActor> {
                         request,
                         self(),
                         new ArrayList<>(request.returnPath.subList(0, request.returnPath.size() - 1)),
-                        request.gotoPath,
                         newAnswers,
                         request.constraints,
                         request.unifiers
@@ -157,7 +168,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
     private void dispatchResponseDone(final Request request) {
         Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
-        ResponseDone responseDone = new ResponseDone(request);
+        ResponseDone responseDone = new ResponseDone(request, self());
         requester.tell((actor) -> actor.receiveDone(responseDone));
     }
 
@@ -170,7 +181,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
         ResponseProducer responseProducer = new ResponseProducer(dependency);
         if (!responseProducer.hasDependency()) {
-            Iterator<Long> traversal = (new MockTransaction(10, 1)).query();
+            Iterator<Long> traversal = (new MockTransaction(2, 1)).query(0L);
             responseProducer.addTraversalProducer(traversal);
         }
 
@@ -180,7 +191,8 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
 class ResponseProducer {
     List<Iterator<Long>> traversalProducers;
-    @Nullable Actor<AtomicActor> dependency = null; // null if there is no dependency or if dependency exhausted
+    @Nullable
+    Actor<AtomicActor> dependency = null; // null if there is no dependency or if dependency exhausted
     List<Long> answers = new LinkedList<>();
     int requested = 0;
     int dispatched = 0;
@@ -254,6 +266,7 @@ class Request {
 
 interface Response {
     Request request();
+
     Actor<AtomicActor> responder();
 
 }
@@ -281,23 +294,20 @@ class ResponseDone implements Response {
 class ResponseAnswer implements Response {
     private final Request request;
     private Actor<AtomicActor> responder;
-    private final List<Actor<AtomicActor>> returnPath;
-    private final List<Actor<AtomicActor>> gotoPath;
-    private final List<Long> partialAnswers;
-    private final List<Object> constraints;
-    private final List<Object> unifiers;
+    final List<Actor<AtomicActor>> returnPath;
+    final List<Long> partialAnswers;
+    final List<Object> constraints;
+    final List<Object> unifiers;
 
     public ResponseAnswer(Request request,
                           Actor<AtomicActor> responder,
                           List<Actor<AtomicActor>> returnPath,
-                          List<Actor<AtomicActor>> gotoPath,
                           List<Long> partialAnswers,
                           List<Object> constraints,
                           List<Object> unifiers) {
         this.request = request;
         this.responder = responder;
         this.returnPath = returnPath;
-        this.gotoPath = gotoPath;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;

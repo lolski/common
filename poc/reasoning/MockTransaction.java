@@ -17,9 +17,9 @@ public class MockTransaction {
         this.answerInterval = answerInterval;
     }
 
-    public Iterator<Long> query() {
+    public Iterator<Long> query(final Long partialAnswer) {
         return new Iterator<Long>() {
-            long count = 0L;
+            long count = partialAnswer;
 
             @Override
             public boolean hasNext() {

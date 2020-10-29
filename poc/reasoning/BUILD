@@ -19,5 +19,8 @@ java_binary(
     name = "reasoning",
     main_class = "grakn.common.poc.reasoning.Reasoning",
     srcs = ["MockTransaction.java", "Reasoning.java"],
-    deps = ["//:common"],
+    deps = [
+        "//:common",
+        "@maven//:com_google_code_findbugs_jsr305"
+    ],
 )
