@@ -2,6 +2,8 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.concurrent.actor.Actor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -28,7 +30,57 @@ class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     public void next(NextMessage request) {
+        if (!todos.containsKey(request)) {
 
+            // initialise traversal
+            Iterator<Long> traversal = (new MockTransaction(10, 1)).query();
+            List<ResumeLocalProducer> producers = Arrays.asList(new ResumeTraversal(request));
+
+            // initialise rules
+            for (Actor<RuleActor> rule : getApplicableRuleActors(request)) {
+                producers.add(new ResumeRule(request, rule));
+            }
+
+            // record the new todo
+            Todos todo = new Todos(traversal, producers);
+            todos.put(request, todo);
+        }
+
+        dispatchProducers(request);
+    }
+
+    private void dispatchProducers(NextMessage request) {
+        Todos todo = todos.get(request);
+        int availableProducers = todo.localProducers.size();
+        // TODO note that this may not dispatch enough sub-requests if there are fewer processors than there are requests
+        // however, we will dispatch more producers as required when we receive a DONE or an ANSWER as well?
+        for (int i = 0; i < availableProducers; i++) {
+            // TODO if we want to do pre-compute, we can request more than the requested number answers at once
+            if (todo.requested > todo.dispatchedProducers) {
+                // TODO choose in what order to activate the available active producers
+                // for now, do round robin
+
+                ResumeLocalProducer resumption = todo.localProducers.get(i);
+
+                if (resumption instanceof ResumeRule) {
+                    self().tell((actor -> actor.resumeRule((ResumeRule) resumption)));
+                } else if (resumption instanceof ResumeTraversal) {
+                    self().tell(actor -> actor.resumeTraversal((ResumeTraversal) resumption));
+                } else {
+                    throw new RuntimeException("Unknown resume: " + resumption);
+                }
+
+                // at this point, we've dispatched messages to produce new answers
+                // record the number of in-processing
+                todo.dispatchedProducers++;
+            }
+        }
+    }
+
+
+    private List<Actor<RuleActor>> getApplicableRuleActors(final NextMessage request) {
+        // TODO find some applicable rules
+        return Arrays.asList();
     }
 
     public void done(DoneMessage done) {
@@ -48,15 +100,57 @@ class AtomicActor extends Actor.State<AtomicActor> {
             // TODO send answer if requested, else buffer
             // TODO decrement processing
         } else {
-            todo.resumeDone(resumeTraversal);
+            todo.traversalCompleted(resumeTraversal);
         }
 
         if (todo.finished()) {
-            // TODO send DONE
+            Actor<AtomicActor> requester = source.returnPath.get(source.returnPath.size() - 1);
+            DoneMessage doneMessage = new DoneMessage(source);
+            requester.tell((actor) -> actor.done(doneMessage));
         }
     }
 
     public void resumeRule(ResumeRule resumeRule) {
+        NextMessage source = resumeRule.source;
+        Todos todo = this.todos.get(source);
+        if (!todo.isRuleCompleted(resumeRule)) {
+            Actor<RuleActor> ruleActor = resumeRule.ruleActor;
+            // request the next answer from the rule actor
+            List<Actor<AtomicActor>> returnPath = new ArrayList<>(source.returnPath.size() + 1);
+            returnPath.addAll(source.returnPath);
+            returnPath.add(self());
+
+            NextMessage request = new NextMessage(
+                    returnPath,
+                    source.gotoPath,
+                    source.partialAnswers,
+                    source.constraints,
+                    source.unifiers
+            );
+
+            ruleActor.tell((actor) -> actor.next(request));
+        }
+    }
+}
+
+class RuleActor extends Actor.State<RuleActor> {
+
+    // Rule TODOs can be simpler
+    private Map<NextMessage, Todos> todos;
+
+    protected RuleActor(final Actor<RuleActor> self) {
+        super(self);
+    }
+
+    public void next(NextMessage request) {
+
+    }
+
+    public void answer(AnswerMessage answer) {
+
+    }
+
+    public void done(DoneMessage done) {
 
     }
 }
@@ -64,46 +158,51 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
 class Todos {
     Iterator<Long> traversal;
-    List<Resume> resumeCompute; // only modified when a DONE or traversal hasNext() == false lets us remove a Continue
+    List<ResumeLocalProducer> localProducers; // only shrinks when a DONE or traversal hasNext() == false
     List<Long> answers = new LinkedList<>();
     int requested = 0;
-    int processing = 0;
+    int dispatchedProducers = 0;
 
-    public Todos(Iterator<Long> traversal, List<Resume> initialResume) {
+    public Todos(Iterator<Long> traversal, List<ResumeLocalProducer> localProducers) {
         this.traversal = traversal;
-        this.resumeCompute = initialResume;
+        this.localProducers = localProducers;
     }
 
-    public void ruleDone(ResumeRule rule) {
-        resumeCompute.remove(rule);
+    public boolean isRuleCompleted(ResumeRule rule) {
+        return localProducers.contains(rule);
     }
 
-    public void resumeDone(ResumeTraversal resume) {
-        resumeCompute.remove(resume);
+    public void ruleCompleted(ResumeRule rule) {
+        localProducers.remove(rule);
+    }
+
+    public void traversalCompleted(ResumeTraversal resume) {
+        localProducers.remove(resume);
     }
 
     public boolean finished() {
-        return resumeCompute.isEmpty();
+        return localProducers.isEmpty();
     }
 }
 
 
-class Resume { }
-class ResumeTraversal extends Resume {
+class ResumeLocalProducer { }
+class ResumeTraversal extends ResumeLocalProducer {
     NextMessage source;
     public ResumeTraversal(NextMessage source) {
         this.source = source;
     }
 }
-class ResumeRule extends Resume {
+class ResumeRule extends ResumeLocalProducer {
     NextMessage source;
-    private Actor<?> ruleActor;
+    Actor<RuleActor> ruleActor;
 
-    public ResumeRule(NextMessage source, Actor<?> ruleActor) {
+    public ResumeRule(NextMessage source, Actor<RuleActor> ruleActor) {
         this.source = source;
         this.ruleActor = ruleActor;
     }
 }
+
 
 interface Request { }
 
@@ -112,11 +211,11 @@ interface Response {
 }
 
 class NextMessage implements Request {
-    private final List<Actor<AtomicActor>> returnPath;
-    private final List<Actor<AtomicActor>> gotoPath;
-    private final List<Long> partialAnswers;
-    private final List<Object> constraints;
-    private final List<Object> unifiers;
+    final List<Actor<AtomicActor>> returnPath;
+    final List<Actor<AtomicActor>> gotoPath;
+    final List<Long> partialAnswers;
+    final List<Object> constraints;
+    final List<Object> unifiers;
 
     public NextMessage(List<Actor<AtomicActor>> returnPath,
                        List<Actor<AtomicActor>> gotoPath,
