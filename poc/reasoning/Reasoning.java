@@ -19,18 +19,18 @@ public class Reasoning {
 
 class AtomicActor extends Actor.State<AtomicActor> {
 
-    private Map<NextMessage, Todos> todos;
+    private Map<Request, ResponseProducer> responseProducers;
     private Long queryPattern;
 
     public AtomicActor(final Actor<AtomicActor> self, Long queryPattern) {
         super(self);
         this.queryPattern = queryPattern;
         // the query pattern long represents some thing to pass to a traversal or resolve further
-        todos = new HashMap<>();
+        responseProducers = new HashMap<>();
     }
 
-    public void next(NextMessage request) {
-        if (!todos.containsKey(request)) {
+    public void request(Request request) {
+        if (!responseProducers.containsKey(request)) {
 
             // initialise traversal
             Iterator<Long> traversal = (new MockTransaction(10, 1)).query();
@@ -41,94 +41,55 @@ class AtomicActor extends Actor.State<AtomicActor> {
                 producers.add(new ResumeRule(request, rule));
             }
 
-            // record the new todo
-            Todos todo = new Todos(traversal, producers);
-            todos.put(request, todo);
+            // record the new responseProducer
+            ResponseProducer responseProducer = new ResponseProducer(traversal, producers);
+            responseProducers.put(request, responseProducer);
         }
 
         dispatchProducers(request);
     }
 
-    private void dispatchProducers(NextMessage request) {
-        Todos todo = todos.get(request);
-        int availableProducers = todo.localProducers.size();
-        // TODO note that this may not dispatch enough sub-requests if there are fewer processors than there are requests
-        // however, we will dispatch more producers as required when we receive a DONE or an ANSWER as well?
-        for (int i = 0; i < availableProducers; i++) {
-            // TODO if we want to do pre-compute, we can request more than the requested number answers at once
-            if (todo.requested > todo.dispatchedProducers) {
-                // TODO choose in what order to activate the available active producers
-                // for now, do round robin
+    public void responseDone(ResponseDone done) {
+        Request request = done.request();
+        ResponseProducer responseProducer = responseProducers.get(request);
 
-                ResumeLocalProducer resumption = todo.localProducers.get(i);
-
-                if (resumption instanceof ResumeRule) {
-                    self().tell((actor -> actor.resumeRule((ResumeRule) resumption)));
-                } else if (resumption instanceof ResumeTraversal) {
-                    self().tell(actor -> actor.resumeTraversal((ResumeTraversal) resumption));
-                } else {
-                    throw new RuntimeException("Unknown resume: " + resumption);
-                }
-
-                // at this point, we've dispatched messages to produce new answers
-                // record the number of in-processing
-                todo.dispatchedProducers++;
-            }
-        }
-    }
-
-    private List<Actor<RuleActor>> getApplicableRuleActors(final NextMessage request) {
-        // TODO find some applicable rules
-        return Arrays.asList();
-    }
-
-    public void done(DoneMessage done) {
-        NextMessage request = done.request();
-        Todos todo = todos.get(request);
-
-        if (todo.finished()) {
+        if (responseProducer.finished()) {
             dispatchDone(request);
         }
     }
 
-    private void dispatchDone(final NextMessage request) {
-        Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
-        DoneMessage doneMessage = new DoneMessage(request);
-        requester.tell((actor) -> actor.done(doneMessage));
-    }
-
-    public void answer(AnswerMessage answer) {
+    public void responseAnswer(ResponseAnswer answer) {
 
     }
 
-    public void resumeTraversal(ResumeTraversal resumeTraversal) {
-        NextMessage source = resumeTraversal.source;
-        Todos todo = this.todos.get(source);
-        if (todo.traversal.hasNext()) {
-            Long answer = todo.traversal.next();
+    private void resumeTraversal(ResumeTraversal resumeTraversal) {
+        Request source = resumeTraversal.source;
+        ResponseProducer responseProducer = this.responseProducers.get(source);
+        if (responseProducer.localTraversal.hasNext()) {
+            Long answer = responseProducer.localTraversal.next();
             answer += this.queryPattern;
             // TODO send answer if requested, else buffer
             // TODO decrement processing
         } else {
-            todo.traversalCompleted(resumeTraversal);
+            responseProducer.traversalDone(resumeTraversal);
         }
 
-        if (todo.finished()) {
+        if (responseProducer.finished()) {
             dispatchDone(source);
         }
     }
 
-    public void resumeRule(ResumeRule resumeRule) {
-        NextMessage source = resumeRule.source;
-        Todos todo = this.todos.get(source);
-        if (!todo.isRuleCompleted(resumeRule)) {
+    private void resumeRule(ResumeRule resumeRule) {
+        Request source = resumeRule.source;
+        ResponseProducer responseProducer = this.responseProducers.get(source);
+        if (!responseProducer.isRuleProducerDone(resumeRule)) {
             Actor<RuleActor> ruleActor = resumeRule.ruleActor;
             // request the next answer from the rule actor
             List<Actor<AtomicActor>> returnPath = new ArrayList<>(source.returnPath.size() + 1);
             returnPath.addAll(source.returnPath);
             returnPath.add(self());
 
-            NextMessage request = new NextMessage(
+            Request request = new Request(
                     returnPath,
                     source.gotoPath,
                     source.partialAnswers,
@@ -141,86 +102,123 @@ class AtomicActor extends Actor.State<AtomicActor> {
         }
 
     }
+
+    private void dispatchProducers(Request request) {
+        ResponseProducer responseProducer = responseProducers.get(request);
+        int availableProducers = responseProducer.producers.size();
+        // TODO note that this may not dispatch enough sub-requests if there are fewer processors than there are requests
+        // however, we will dispatch more producers as required when we receive a DONE or an ANSWER as well?
+        for (int i = 0; i < availableProducers; i++) {
+            // TODO if we want to do pre-compute, we can request more than the requested number answers at once
+            if (responseProducer.requested > responseProducer.dispatched) {
+                // TODO choose in what order to activate the available active producers
+                // for now, do round robin
+
+                ResumeLocalProducer resumption = responseProducer.producers.get(i);
+
+                if (resumption instanceof ResumeRule) {
+                    self().tell((actor -> actor.resumeRule((ResumeRule) resumption)));
+                } else if (resumption instanceof ResumeTraversal) {
+                    self().tell(actor -> actor.resumeTraversal((ResumeTraversal) resumption));
+                } else {
+                    throw new RuntimeException("Unknown resume: " + resumption);
+                }
+
+                // at this point, we've dispatched messages to produce new answers
+                // record the number of in-processing
+                responseProducer.dispatched++;
+            }
+        }
+    }
+
+    private List<Actor<RuleActor>> getApplicableRuleActors(final Request request) {
+        // TODO find some applicable rules
+        return Arrays.asList();
+    }
+
+    private void dispatchDone(final Request request) {
+        Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
+        ResponseDone responseDone = new ResponseDone(request);
+        requester.tell((actor) -> actor.responseDone(responseDone));
+    }
 }
 
 class RuleActor extends Actor.State<RuleActor> {
 
     // Rule TODOs can be simpler
-    private Map<NextMessage, Todos> todos;
+    private Map<Request, ResponseProducer> responseProducers;
 
     protected RuleActor(final Actor<RuleActor> self) {
         super(self);
     }
 
-    public void next(NextMessage request) {
+    public void next(Request request) {
 
     }
 
-    public void answer(AnswerMessage answer) {
+    public void answer(ResponseAnswer answer) {
 
     }
 
-    public void done(DoneMessage done) {
+    public void done(ResponseDone done) {
 
     }
 }
 
 
-class Todos {
-    Iterator<Long> traversal;
-    List<ResumeLocalProducer> localProducers; // only shrinks when a DONE or traversal hasNext() == false
+class ResponseProducer {
+    Iterator<Long> localTraversal;
+    List<ResumeLocalProducer> producers; // only shrinks when a DONE or traversal hasNext() == false
     List<Long> answers = new LinkedList<>();
     int requested = 0;
-    int dispatchedProducers = 0;
+    int dispatched = 0;
 
-    public Todos(Iterator<Long> traversal, List<ResumeLocalProducer> localProducers) {
-        this.traversal = traversal;
-        this.localProducers = localProducers;
+    public ResponseProducer(Iterator<Long> localTraversal, List<ResumeLocalProducer> producers) {
+        this.localTraversal = localTraversal;
+        this.producers = producers;
     }
 
-    public boolean isRuleCompleted(ResumeRule rule) {
-        return localProducers.contains(rule);
+    public boolean isRuleProducerDone(ResumeRule rule) {
+        return producers.contains(rule);
     }
 
-    public void ruleCompleted(ResumeRule rule) {
-        localProducers.remove(rule);
+    public void ruleProducerDone(ResumeRule rule) {
+        producers.remove(rule);
     }
 
-    public void traversalCompleted(ResumeTraversal resume) {
-        localProducers.remove(resume);
+    public void traversalDone(ResumeTraversal resume) {
+        producers.remove(resume);
     }
 
     public boolean finished() {
-        return localProducers.isEmpty();
+        return producers.isEmpty();
     }
 }
 
 
 class ResumeLocalProducer { }
 class ResumeTraversal extends ResumeLocalProducer {
-    NextMessage source;
-    public ResumeTraversal(NextMessage source) {
+    Request source;
+    public ResumeTraversal(Request source) {
         this.source = source;
     }
 }
 class ResumeRule extends ResumeLocalProducer {
-    NextMessage source;
+    Request source;
     Actor<RuleActor> ruleActor;
 
-    public ResumeRule(NextMessage source, Actor<RuleActor> ruleActor) {
+    public ResumeRule(Request source, Actor<RuleActor> ruleActor) {
         this.source = source;
         this.ruleActor = ruleActor;
     }
 }
 
 
-interface Request { }
-
 interface Response {
     Request request();
 }
 
-class NextMessage implements Request {
+class Request {
     final List<Actor<AtomicActor>> returnPath;
     final List<Actor<AtomicActor>> gotoPath;
     final List<Long> partialAnswers;
@@ -228,12 +226,12 @@ class NextMessage implements Request {
     final List<Object> unifiers;
     ResumeLocalProducer localRequester;
 
-    public NextMessage(List<Actor<AtomicActor>> returnPath,
-                       List<Actor<AtomicActor>> gotoPath,
-                       List<Long> partialAnswers,
-                       List<Object> constraints,
-                       List<Object> unifiers,
-                       ResumeLocalProducer localRequester) {
+    public Request(List<Actor<AtomicActor>> returnPath,
+                   List<Actor<AtomicActor>> gotoPath,
+                   List<Long> partialAnswers,
+                   List<Object> constraints,
+                   List<Object> unifiers,
+                   ResumeLocalProducer localRequester) {
 
         this.returnPath = returnPath;
         this.gotoPath = gotoPath;
@@ -244,32 +242,32 @@ class NextMessage implements Request {
     }
 }
 
-class DoneMessage implements Response {
-    private NextMessage request;
-    public DoneMessage(NextMessage request) {
+class ResponseDone implements Response {
+    private Request request;
+    public ResponseDone(Request request) {
         this.request = request;
     }
 
     @Override
-    public NextMessage request() {
+    public Request request() {
         return request;
     }
 }
 
-class AnswerMessage implements Response {
-    private final NextMessage request;
+class ResponseAnswer implements Response {
+    private final Request request;
     private final List<Actor<AtomicActor>> returnPath;
     private final List<Actor<AtomicActor>> gotoPath;
     private final List<Long> partialAnswers;
     private final List<Object> constraints;
     private final List<Object> unifiers;
 
-    public AnswerMessage(NextMessage request,
-                         List<Actor<AtomicActor>> returnPath,
-                         List<Actor<AtomicActor>> gotoPath,
-                         List<Long> partialAnswers,
-                         List<Object> constraints,
-                         List<Object> unifiers) {
+    public ResponseAnswer(Request request,
+                          List<Actor<AtomicActor>> returnPath,
+                          List<Actor<AtomicActor>> gotoPath,
+                          List<Long> partialAnswers,
+                          List<Object> constraints,
+                          List<Object> unifiers) {
 
         this.request = request;
         this.returnPath = returnPath;
@@ -280,7 +278,7 @@ class AnswerMessage implements Response {
     }
 
     @Override
-    public NextMessage request() {
+    public Request request() {
         return request;
     }
 }
