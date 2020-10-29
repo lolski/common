@@ -1,5 +1,6 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.collection.Pair;
 import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Reasoning {
     public static LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
@@ -42,24 +44,24 @@ public class Reasoning {
 
 class AtomicActor extends Actor.State<AtomicActor> {
 
-    private final Map<Request, ResponseProducer> request;
-    private final Map<Request, Request> subrequest;
+    private final Map<Request, ResponseProducer> requests;
+    private final Map<Request, Request> subrequests; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
     private final Long queryPattern;
 
     public AtomicActor(final Actor<AtomicActor> self, Long queryPattern) {
         super(self);
         this.queryPattern = queryPattern;
         // the query pattern long represents some thing to pass to a traversal or resolve further
-        request = new HashMap<>();
-        subrequest = new HashMap<>();
+        requests = new HashMap<>();
+        subrequests = new HashMap<>();
     }
 
     public void receiveRequest(Request request) {
-        if (!this.request.containsKey(request)) {
-            this.request.put(request, createResponseProducer(request));
+        if (!this.requests.containsKey(request)) {
+            this.requests.put(request, createResponseProducer(request));
         }
 
-        ResponseProducer responseProducer = this.request.get(request);
+        ResponseProducer responseProducer = this.requests.get(request);
         // TODO if we want batching, we increment by as many as are requested
         responseProducer.requested++;
 
@@ -68,15 +70,41 @@ class AtomicActor extends Actor.State<AtomicActor> {
             enqueueAnswers(request, responseProducer, answers);
         }
 
+        requestFromDependency(request, responseProducer);
+
         if (responseProducer.finished()) dispatchResponseDone(request);
     }
 
+    private void requestFromDependency(final Request request, final ResponseProducer responseProducer) {
+        Actor<AtomicActor> dependency = responseProducer.dependency;
+        if (dependency != null) {
+            List<Actor<AtomicActor>> returnPath = new ArrayList<>(request.returnPath);
+            returnPath.add(self());
+            Request subrequest = new Request(
+                    returnPath,
+                    new ArrayList<>(request.gotoPath.subList(0, request.gotoPath.size() - 1)),
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
+
+            // TODO we may overwrite if multiple identical requests are sent
+            subrequests.put(subrequest, request);
+
+            dependency.tell(actor -> actor.receiveRequest(subrequest));
+        }
+    }
+
     public void receiveDone(ResponseDone done) {
-        Request request = done.request();
-        ResponseProducer responseProducer = this.request.get(request);
+        Request sourceSubRequest = done.request();
+        Request parentRequest = subrequests.get(sourceSubRequest);
+        ResponseProducer responseProducer = requests.get(parentRequest);
+
+        Actor<AtomicActor> responder = done.responder();
+        responseProducer.dependencyDone(responder);
 
         if (responseProducer.finished()) {
-            dispatchResponseDone(request);
+            dispatchResponseDone(parentRequest);
         }
     }
 
@@ -114,6 +142,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
                 newAnswers.add(answer);
                 ResponseAnswer responseAnswer = new ResponseAnswer(
                         request,
+                        self(),
                         new ArrayList<>(request.returnPath.subList(0, request.returnPath.size() - 1)),
                         request.gotoPath,
                         newAnswers,
@@ -176,7 +205,13 @@ class ResponseProducer {
     public boolean finished() {
         return dependency == null && traversalProducers.isEmpty();
     }
+
+    public void dependencyDone(final Actor<AtomicActor> responder) {
+        assert dependency == responder;
+        dependency = null;
+    }
 }
+
 
 class Request {
     final List<Actor<AtomicActor>> returnPath;
@@ -216,25 +251,36 @@ class Request {
     }
 }
 
-class Response {
-    
+
+interface Response {
+    Request request();
+    Actor<AtomicActor> responder();
+
 }
 
 class ResponseDone implements Response {
     private Request request;
+    private Actor<AtomicActor> responder;
 
-    public ResponseDone(Request request) {
+    public ResponseDone(Request request, Actor<AtomicActor> responder) {
         this.request = request;
+        this.responder = responder;
     }
 
     @Override
     public Request request() {
         return request;
     }
+
+    @Override
+    public Actor<AtomicActor> responder() {
+        return responder;
+    }
 }
 
 class ResponseAnswer implements Response {
     private final Request request;
+    private Actor<AtomicActor> responder;
     private final List<Actor<AtomicActor>> returnPath;
     private final List<Actor<AtomicActor>> gotoPath;
     private final List<Long> partialAnswers;
@@ -242,13 +288,14 @@ class ResponseAnswer implements Response {
     private final List<Object> unifiers;
 
     public ResponseAnswer(Request request,
+                          Actor<AtomicActor> responder,
                           List<Actor<AtomicActor>> returnPath,
                           List<Actor<AtomicActor>> gotoPath,
                           List<Long> partialAnswers,
                           List<Object> constraints,
                           List<Object> unifiers) {
-
         this.request = request;
+        this.responder = responder;
         this.returnPath = returnPath;
         this.gotoPath = gotoPath;
         this.partialAnswers = partialAnswers;
@@ -259,6 +306,11 @@ class ResponseAnswer implements Response {
     @Override
     public Request request() {
         return request;
+    }
+
+    @Override
+    public Actor<AtomicActor> responder() {
+        return responder;
     }
 }
 
