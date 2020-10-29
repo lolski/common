@@ -22,21 +22,25 @@ public class Reasoning {
     public static void main(String[] args) throws InterruptedException {
         EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
-        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 50L))).await();
-        Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, -100L))).await();
+        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2L))).await();
+        Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20L))).await();
+        Actor<AtomicActor> subAtomic1 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 200L))).await();
+        Actor<AtomicActor> subAtomic2 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2000L))).await();
+        Actor<AtomicActor> subAtomic3 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20000L))).await();
 
-        atomic.tell(actor ->
-                actor.receiveRequest(
-                        new Request(Arrays.asList(), Arrays.asList(subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
-                )
-        );
-        System.out.println(answers.take());
-        atomic.tell(actor ->
-                actor.receiveRequest(
-                        new Request(Arrays.asList(), Arrays.asList(subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
-                )
-        );
-        System.out.println(answers.take());
+        long startTime = System.currentTimeMillis();
+        int n = 1000;
+        for (int i = 0; i < n; i++) {
+            atomic.tell(actor ->
+                    actor.receiveRequest(
+                            new Request(Arrays.asList(), Arrays.asList(subAtomic3, subAtomic2, subAtomic1, subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                    )
+            );
+        }
+        for (int i = 0; i < n; i++) {
+            answers.take();
+        }
+        System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         System.out.println(answers.take());
         System.out.println("should not be printed");
     }
@@ -108,6 +112,13 @@ class AtomicActor extends Actor.State<AtomicActor> {
         if (responseProducer.finished()) {
             dispatchResponseDone(parentRequest);
         }
+
+
+        /*
+        TODO: major flaw here is that when we get a DONE, we have fewer messages dispatched which should have
+        TODO: lead to answers to the original request. To compensate, we should "retry" getting answers
+        TODO: either from another actor, or a local traversal from the list of local traversals
+         */
     }
 
     public void receiveAnswer(ResponseAnswer answer) {
@@ -118,7 +129,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         List<Long> partialAnswers = answer.partialAnswers;
         Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
 
-        Iterator<Long> traversal = (new MockTransaction(2, 1)).query(mergedAnswers);
+        Iterator<Long> traversal = (new MockTransaction(10, 1)).query(mergedAnswers);
         responseProducer.addTraversalProducer(traversal);
 
         List<Long> answers = produceTraversalAnswers(responseProducer);
@@ -126,7 +137,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private void enqueueAnswers(final Request request, final ResponseProducer responseProducer, final List<Long> answers) {
-        System.out.println(answers);
+//        System.out.println(answers);
         responseProducer.answers.addAll(answers);
         dispatchResponseAnswers(request, responseProducer);
     }
@@ -186,7 +197,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
         ResponseProducer responseProducer = new ResponseProducer(dependency);
         if (!responseProducer.hasDependency()) {
-            Iterator<Long> traversal = (new MockTransaction(2, 1)).query(0L);
+            Iterator<Long> traversal = (new MockTransaction(10, 1)).query(0L);
             responseProducer.addTraversalProducer(traversal);
         }
 
