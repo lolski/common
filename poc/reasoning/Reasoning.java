@@ -38,7 +38,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         // TODO if we want batching, we increment by as many as are requested
         responseProducer.requested++;
 
-        dispatchProducers(request);
+        process(request);
     }
 
     public void responseDone(ResponseDone done) {
@@ -46,7 +46,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         ResponseProducer responseProducer = responseProducers.get(request);
 
         if (responseProducer.finished()) {
-            dispatchDone(request);
+            dispatchResponseDone(request);
         }
     }
 
@@ -84,10 +84,45 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
     }
 
-    private void dispatchProducers(Request request) {
+    private void process(Request request) {
         ResponseProducer responseProducer = responseProducers.get(request);
-        int availableRuleProducers = responseProducer.ruleProducers.size();
+        dispatchResponseAnswers(request, responseProducer);
 
+        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
+            produceTraversalAnswers(responseProducer);
+        }
+
+        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
+            dispatchRuleRequests(responseProducer);
+        }
+
+        dispatchResponseAnswers(request, responseProducer);
+
+        if (responseProducer.finished()) {
+            dispatchResponseDone(request);
+        }
+    }
+
+    private void dispatchRuleRequests(final ResponseProducer responseProducer) {
+        for (Actor<RuleActor> ruleActor : responseProducer.ruleProducers) {
+            // TODO fill in REQUEST
+            Request nextAnswerRequest = null;
+            ruleActor.tell((actor) -> actor.request(nextAnswerRequest));
+            responseProducer.dispatched++;
+        }
+    }
+
+    private void produceTraversalAnswers(final ResponseProducer responseProducer) {
+        // choose some strategy to answer the request
+        if (responseProducer.traversalProducer.hasNext()) {
+            Long answer = responseProducer.traversalProducer.next();
+            answer += this.queryPattern;
+            responseProducer.answers.add(answer);
+        }
+    }
+
+    private void dispatchResponseAnswers(final Request request, final ResponseProducer responseProducer) {
+        // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requested, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
             Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
@@ -97,7 +132,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
             newAnswers.add(answer);
             ResponseAnswer responseAnswer = new ResponseAnswer(
                     request,
-                    request.returnPath,
+                    new ArrayList<>(request.returnPath.subList(0, request.returnPath.size() - 1)),
                     request.gotoPath,
                     newAnswers,
                     request.constraints,
@@ -106,32 +141,6 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
             requester.tell((actor) -> actor.responseAnswer(responseAnswer));
         }
-
-
-        if (responseProducer.requested > responseProducer.dispatched) {
-            // choose some strategy to answer the request
-            if (responseProducer.traversalProducer.hasNext()) {
-                Long answer = responseProducer.traversalProducer.next();
-                answer += this.queryPattern;
-
-                // TODO send answer if requested, else buffer
-                // TODO decrement processing
-
-                responseProducer.answers.add(answer);
-            }
-
-            for (Actor<RuleActor> ruleActor : responseProducer.ruleProducers) {
-                // TODO fill in
-                Request nextAnswerRequest = null;
-                ruleActor.tell((actor) -> actor.request(nextAnswerRequest));
-                responseProducer.dispatched++;
-            }
-        }
-
-
-        if (responseProducer.finished()) {
-            dispatchDone(request);
-        }
     }
 
     private List<Actor<RuleActor>> getApplicableRuleActors(final Request request) {
@@ -139,7 +148,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         return Arrays.asList();
     }
 
-    private void dispatchDone(final Request request) {
+    private void dispatchResponseDone(final Request request) {
         Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
         ResponseDone responseDone = new ResponseDone(request);
         requester.tell((actor) -> actor.responseDone(responseDone));
@@ -203,7 +212,7 @@ class ResponseProducer {
     }
 
     public boolean finished() {
-        return ruleProducers.isEmpty();
+        return ruleProducers.isEmpty() && !traversalProducer.hasNext();
     }
 }
 
