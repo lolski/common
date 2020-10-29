@@ -70,8 +70,10 @@ class AtomicActor extends Actor.State<AtomicActor> {
             enqueueAnswers(request, responseProducer, answers);
         }
 
-        if (responseProducer.dependency != null) {
-            requestFromDependency(request, responseProducer);
+        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
+            if (responseProducer.dependency != null) {
+                requestFromDependency(request, responseProducer);
+            }
         }
 
         if (responseProducer.finished()) dispatchResponseDone(request);
@@ -130,9 +132,11 @@ class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
-        if (!responseProducer.traversalProducers.isEmpty() && responseProducer.traversalProducers.get(0).hasNext()) {
+        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
+        if (traversalProducer != null) {
             // TODO could do batch traverse, or retrieve answers from multiple traversals
-            Long answer = responseProducer.traversalProducers.get(0).next();
+            Long answer = traversalProducer.next();
+            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
             answer += this.queryPattern;
             return Arrays.asList(answer);
         }
@@ -163,6 +167,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
                 requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
+            responseProducer.requested--;
         }
     }
 
@@ -204,6 +209,12 @@ class ResponseProducer {
 
     public void addTraversalProducer(Iterator<Long> traversalProducer) {
         traversalProducers.add(traversalProducer);
+    }
+
+    @Nullable
+    public Iterator<Long> getOneTraversalProducer() {
+        if (!traversalProducers.isEmpty()) return traversalProducers.get(0);
+        return null;
     }
 
     public void removeTraversalProducer(Iterator<Long> traversalProducer) {
@@ -266,9 +277,7 @@ class Request {
 
 interface Response {
     Request request();
-
     Actor<AtomicActor> responder();
-
 }
 
 class ResponseDone implements Response {

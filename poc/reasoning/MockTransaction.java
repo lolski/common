@@ -19,7 +19,7 @@ public class MockTransaction {
 
     public Iterator<Long> query(final Long partialAnswer) {
         return new Iterator<Long>() {
-            long count = partialAnswer;
+            long count = 0L;
 
             @Override
             public boolean hasNext() {
@@ -31,7 +31,7 @@ public class MockTransaction {
                 while (count < computeLength) {
                     if (count % answerInterval == 0) {
                         count++;
-                        return count - 1;
+                        return count - 1 + partialAnswer;
                     } else {
                         count++;
                     }
