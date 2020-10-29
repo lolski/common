@@ -5,6 +5,7 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -41,20 +42,24 @@ public class Reasoning {
 
 class AtomicActor extends Actor.State<AtomicActor> {
 
-    private final Map<Request, ResponseProducer> responseProducers;
+    private final Map<Request, ResponseProducer> request;
+    private final Map<Request, Request> subrequest;
     private final Long queryPattern;
 
     public AtomicActor(final Actor<AtomicActor> self, Long queryPattern) {
         super(self);
         this.queryPattern = queryPattern;
         // the query pattern long represents some thing to pass to a traversal or resolve further
-        responseProducers = new HashMap<>();
+        request = new HashMap<>();
+        subrequest = new HashMap<>();
     }
 
     public void receiveRequest(Request request) {
-        if (!responseProducers.containsKey(request)) responseProducers.put(request, createResponseProducer(request));
+        if (!this.request.containsKey(request)) {
+            this.request.put(request, createResponseProducer(request));
+        }
 
-        ResponseProducer responseProducer = responseProducers.get(request);
+        ResponseProducer responseProducer = this.request.get(request);
         // TODO if we want batching, we increment by as many as are requested
         responseProducer.requested++;
 
@@ -68,7 +73,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
     public void receiveDone(ResponseDone done) {
         Request request = done.request();
-        ResponseProducer responseProducer = responseProducers.get(request);
+        ResponseProducer responseProducer = this.request.get(request);
 
         if (responseProducer.finished()) {
             dispatchResponseDone(request);
@@ -85,9 +90,9 @@ class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
-        if (responseProducer.traversalProducer.hasNext()) {
-            // TODO could batch traverse here
-            Long answer = responseProducer.traversalProducer.next();
+        if (!responseProducer.traversalProducers.isEmpty() && responseProducer.traversalProducers.get(0).hasNext()) {
+            // TODO could do batch traverse, or retrieve answers from multiple traversals
+            Long answer = responseProducer.traversalProducers.get(0).next();
             answer += this.queryPattern;
             return Arrays.asList(answer);
         }
@@ -99,6 +104,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         for (int i = 0; i < Math.min(responseProducer.requested, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
             if (request.returnPath.isEmpty()) {
+                // base case - how to return from Actor model
                 Reasoning.answers.add(answer);
             } else {
                 Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
@@ -128,31 +134,48 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
 
     private ResponseProducer createResponseProducer(final Request request) {
-        // initialise traversal
-        Iterator<Long> traversal = (new MockTransaction(10, 1)).query();
-        // initialise downstream producers
-        return new ResponseProducer(traversal);
+        Actor<AtomicActor> dependency = null;
+        if (request.gotoPath.size() >= 2) {
+            dependency = request.gotoPath.get(request.gotoPath.size() - 2);
+        }
+
+        ResponseProducer responseProducer = new ResponseProducer(dependency);
+        if (!responseProducer.hasDependency()) {
+            Iterator<Long> traversal = (new MockTransaction(10, 1)).query();
+            responseProducer.addTraversalProducer(traversal);
+        }
+
+        return responseProducer;
     }
 }
 
 class ResponseProducer {
-    Iterator<Long> traversalProducer;
+    List<Iterator<Long>> traversalProducers;
+    @Nullable Actor<AtomicActor> dependency = null; // null if there is no dependency or if dependency exhausted
     List<Long> answers = new LinkedList<>();
     int requested = 0;
     int dispatched = 0;
 
-    public ResponseProducer(Iterator<Long> traversalProducer) {
-        this.traversalProducer = traversalProducer;
+    public ResponseProducer(@Nullable Actor<AtomicActor> dependency) {
+        this.traversalProducers = new ArrayList<>();
+        this.dependency = dependency;
+    }
+
+    public void addTraversalProducer(Iterator<Long> traversalProducer) {
+        traversalProducers.add(traversalProducer);
+    }
+
+    public void removeTraversalProducer(Iterator<Long> traversalProducer) {
+        traversalProducers.remove(traversalProducer);
+    }
+
+    public boolean hasDependency() {
+        return dependency != null;
     }
 
     public boolean finished() {
-        return !traversalProducer.hasNext();
+        return dependency == null && traversalProducers.isEmpty();
     }
-}
-
-
-interface Response {
-    Request request();
 }
 
 class Request {
@@ -191,6 +214,10 @@ class Request {
     public int hashCode() {
         return Objects.hash(returnPath, gotoPath, partialAnswers, constraints, unifiers);
     }
+}
+
+class Response {
+    
 }
 
 class ResponseDone implements Response {
