@@ -1,6 +1,9 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.concurrent.actor.ActorRoot;
+import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,11 +12,30 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Reasoning {
-    public static void main(String[] args) {
+    public static LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
 
-
+    public static void main(String[] args) throws InterruptedException {
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
+        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 1L))).await();
+        atomic.tell(actor ->
+                actor.receiveRequest(
+                        new Request(Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                )
+        );
+        atomic.tell(actor ->
+                actor.receiveRequest(
+                        new Request(Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                )
+        );
+        System.out.println(answers.take());
+        System.out.println(answers.take());
+        System.out.println(answers.take());
+        System.out.println("should not be printed");
     }
 }
 
@@ -76,21 +98,25 @@ class AtomicActor extends Actor.State<AtomicActor> {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requested, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
+            if (request.returnPath.isEmpty()) {
+                Reasoning.answers.add(answer);
+            } else {
+                Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
 
-            List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
-            newAnswers.addAll(request.partialAnswers);
-            newAnswers.add(answer);
-            ResponseAnswer responseAnswer = new ResponseAnswer(
-                    request,
-                    new ArrayList<>(request.returnPath.subList(0, request.returnPath.size() - 1)),
-                    request.gotoPath,
-                    newAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
+                List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
+                newAnswers.addAll(request.partialAnswers);
+                newAnswers.add(answer);
+                ResponseAnswer responseAnswer = new ResponseAnswer(
+                        request,
+                        new ArrayList<>(request.returnPath.subList(0, request.returnPath.size() - 1)),
+                        request.gotoPath,
+                        newAnswers,
+                        request.constraints,
+                        request.unifiers
+                );
 
-            requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
+                requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
+            }
         }
     }
 
@@ -147,6 +173,23 @@ class Request {
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Request request = (Request) o;
+        return Objects.equals(returnPath, request.returnPath) &&
+                Objects.equals(gotoPath, request.gotoPath) &&
+                Objects.equals(partialAnswers, request.partialAnswers) &&
+                Objects.equals(constraints, request.constraints) &&
+                Objects.equals(unifiers, request.unifiers);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(returnPath, gotoPath, partialAnswers, constraints, unifiers);
     }
 }
 
