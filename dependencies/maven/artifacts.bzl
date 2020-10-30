@@ -16,6 +16,7 @@
 #
 
 artifacts = [
+  "ch.qos.logback:logback-classic",
   "com.google.code.findbugs:jsr305",
   "commons-io:commons-io",
   "junit:junit",

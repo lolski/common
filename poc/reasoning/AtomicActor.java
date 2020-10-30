@@ -1,6 +1,8 @@
 package grakn.common.poc.reasoning;
 
 import grakn.common.concurrent.actor.Actor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -13,9 +15,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static junit.framework.TestCase.assertTrue;
-
 public class AtomicActor extends Actor.State<AtomicActor> {
+    Logger LOG;
 
     private final Map<Request, ResponseProducer> requestProducers;
     private final Map<Request, Request> requestRouter; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
@@ -26,6 +27,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
     public AtomicActor(final Actor<AtomicActor> self, final String name, Long traversalPattern, final long traversalIteratorLength, final @Nullable LinkedBlockingQueue<Long> responses) {
         super(self);
+        LOG = LoggerFactory.getLogger(AtomicActor.class + "-" + name);
         this.name = name;
         this.traversalPattern = traversalPattern;
         this.traversalIteratorLength = traversalIteratorLength;
@@ -36,15 +38,16 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     public void receiveRequest(final Request request) {
-        System.out.println("Received request in: " + name);
+        LOG.debug("Received request in: " + name);
         if (!this.requestProducers.containsKey(request)) {
             this.requestProducers.put(request, initialiseResponseProducer(request));
         }
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
 
-        if (responseProducer.finished()) respondDoneToRequester(request);
-        else {
+        if (responseProducer.finished()) {
+            respondDoneToRequester(request);
+        } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
 
@@ -62,9 +65,13 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         }
     }
 
+    /*
+    When a receive and answer and pass the answer forward
+    We map the request that generated the answer, to the originating request.
+    We then copy the originating request, and clear the request path, as it must already have been satisfied.
+     */
     public void receiveAnswer(final ResponseAnswer answer) {
-        System.out.println("Received answer response in: " + name);
-        assertTrue(responses.isEmpty());
+        LOG.debug("Received answer response in: " + name);
         Request sourceSubRequest = answer.request();
         Request parentRequest = requestRouter.get(sourceSubRequest);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
@@ -79,7 +86,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     public void receiveDone(final ResponseDone done) {
-        System.out.println("Received done response in: " + name);
+        LOG.debug("Received done response in: " + name);
         Request sourceSubRequest = done.request();
         Request parentRequest = requestRouter.get(sourceSubRequest);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
@@ -87,13 +94,16 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         Actor<AtomicActor> responder = done.responder();
         responseProducer.downstreamDone(responder);
 
-        List<Long> answers = produceTraversalAnswers(responseProducer);
-        responseProducer.answers.addAll(answers);
-        respondAnswersToRequester(parentRequest, responseProducer);
-
         if (responseProducer.finished()) {
             respondDoneToRequester(parentRequest);
+        } else {
+            List<Long> answers = produceTraversalAnswers(responseProducer);
+            responseProducer.answers.addAll(answers);
+            respondAnswersToRequester(parentRequest, responseProducer);
         }
+
+
+
         /*
         TODO: major flaw here is that when we get a DONE, we have fewer messages dispatched which should have
         TODO: lead to answers to the original request. To compensate, we should "retry" getting answers
@@ -116,10 +126,13 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         // TODO we may overwrite if multiple identical requests are sent
         requestRouter.put(subrequest, request);
 
-        System.out.println("Requesting from downstream from: " + name);
+        LOG.debug("Requesting from downstream from: " + name);
         downstream.tell(actor -> actor.receiveRequest(subrequest));
     }
 
+    /*
+    when we respond to a request with an answer, must trim requestPath
+     */
     private void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
@@ -127,12 +140,12 @@ public class AtomicActor extends Actor.State<AtomicActor> {
             if (request.routing.responsePath.isEmpty()) {
                 // base case - how to return from Actor model
                 assert responses != null : this + ": can't return answers because the user answers queue is null";
-                System.out.println("Saving answer to output queue in actor: " + name);
+                LOG.debug("Saving answer to output queue in actor: " + name);
                 responses.add(answer);
             } else {
                 Actor<AtomicActor> requester = request.routing.getRequester();
                 Routing newRouting = request.routing.copy();
-                newRouting.trimResponsePath();
+                newRouting.clearRequestPath();
                 List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
                 newAnswers.addAll(request.partialAnswers);
                 newAnswers.add(answer);
@@ -145,7 +158,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
                         request.unifiers
                 );
 
-                System.out.println("Responding answer to requester from actor: " + name);
+                LOG.debug("Responding answer to requester from actor: " + name);
                 requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
             responseProducer.requestsFromUpstream--;
@@ -156,12 +169,12 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         if (request.routing.responsePath.isEmpty()) {
             // base case - how to return from Actor model
             assert responses != null : this + ": can't return answers because the user answers queue is null";
-            System.out.println("Sending DONE response to output from actor: " + name);
+            LOG.debug("Sending DONE response to output from actor: " + name);
             responses.add(-1L);
         } else {
             Actor<AtomicActor> requester = request.routing.getRequester();
             ResponseDone responseDone = new ResponseDone(request, self());
-            System.out.println("Responding Done to requester from actor: " + name);
+            LOG.debug("Responding Done to requester from actor: " + name);
             requester.tell((actor) -> actor.receiveDone(responseDone));
         }
     }
@@ -308,7 +321,7 @@ class ResponseAnswer implements Response {
                           final List<Long> partialAnswers,
                           final List<Object> constraints,
                           final List<Object> unifiers) {
-        assert routing.responsePath.size() == 0 : "response answer must have an empty responsePath";
+        assert routing.requestPath.size() == 0 : "response answer must have an empty requestPath";
         this.request = request;
         this.responder = responder;
         this.routing = routing;
@@ -346,6 +359,10 @@ class Routing {
         requestPath.remove(requestPath.size()-1);
     }
 
+    public void clearRequestPath() {
+        requestPath.clear();
+    }
+
     public void extendResponsePath(Actor<AtomicActor> respondTo) {
         responsePath.add(respondTo);
     }
@@ -354,6 +371,7 @@ class Routing {
         assert responsePath.size() >= 1 : "can't trim a path object that's already empty";
         responsePath.remove(responsePath.size()-1);
     }
+
 
     @Nullable public Actor<AtomicActor> downstream() {
         if (requestPath.size() >= 2) {

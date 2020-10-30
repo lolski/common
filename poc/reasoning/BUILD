@@ -21,6 +21,14 @@ java_test(
     srcs = ["MockTransaction.java", "AtomicActor.java", "AtomicActorTest.java"],
     deps = [
         "//:common",
-        "@maven//:com_google_code_findbugs_jsr305"
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:org_slf4j_slf4j_api"
     ],
+    runtime_deps = [
+        "@maven//:ch_qos_logback_logback_classic",
+    ],
+    resources = [
+        ":logback.xml"
+    ],
+    resource_strip_prefix = "poc/reasoning"
 )
