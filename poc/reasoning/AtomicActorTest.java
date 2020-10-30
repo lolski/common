@@ -24,9 +24,10 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(new Routing(Arrays.asList(), Arrays.asList(atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Path(Arrays.asList(atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
+            responses.take();
         }
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         Thread.sleep(20);
@@ -46,7 +47,7 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(new Routing(Arrays.asList(), Arrays.asList(subAtomic, atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Path(Arrays.asList(atomic, subAtomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -65,7 +66,7 @@ public class AtomicActorTest {
         EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(AtomicActor.class, "main"));
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
         Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, "3", 2L, 1L, responses))).await();
-        Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, "2", 20L, 1L, null))).await();
+        Actor<AtomicActor> subAtomic1 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, "2", 20L, 1L, null))).await();
         Actor<AtomicActor> subAtomic2 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, "1", 200L, 1L, null))).await();
 
         long startTime = System.currentTimeMillis();
@@ -73,7 +74,7 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(new Routing(Arrays.asList(), Arrays.asList(subAtomic2, subAtomic, atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Path(Arrays.asList(atomic, subAtomic1, subAtomic2)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -100,7 +101,7 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(new Routing(Arrays.asList(), Arrays.asList(subAtomic3, subAtomic2, subAtomic1, subAtomic, atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Path(Arrays.asList(atomic, subAtomic, subAtomic1, subAtomic2, subAtomic3)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }

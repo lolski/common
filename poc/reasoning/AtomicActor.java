@@ -91,8 +91,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         Request parentRequest = requestRouter.get(sourceSubRequest);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
 
-        Actor<AtomicActor> responder = done.responder();
-        responseProducer.downstreamDone(responder);
+        responseProducer.downstreamDone();
 
         if (responseProducer.finished()) {
             respondDoneToRequester(parentRequest);
@@ -113,11 +112,9 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
     private void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
         Actor<AtomicActor> downstream = responseProducer.downstream;
-        Routing newRouting = request.routing.copy();
-        newRouting.extendResponsePath(self());
-        newRouting.trimRequestPath();
+        Path downstreamPath = request.path.moveDownstream();
         Request subrequest = new Request(
-                newRouting,
+                downstreamPath,
                 request.partialAnswers,
                 request.constraints,
                 request.unifiers
@@ -137,22 +134,20 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            if (request.routing.responsePath.isEmpty()) {
+            if (request.path.atRoot()) {
                 // base case - how to return from Actor model
                 assert responses != null : this + ": can't return answers because the user answers queue is null";
                 LOG.debug("Saving answer to output queue in actor: " + name);
                 responses.add(answer);
             } else {
-                Actor<AtomicActor> requester = request.routing.getRequester();
-                Routing newRouting = request.routing.copy();
-                newRouting.clearRequestPath();
+                Actor<AtomicActor> requester = request.path.directUpstream();
+                Path newPath = request.path.moveUpstream();
                 List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
                 newAnswers.addAll(request.partialAnswers);
                 newAnswers.add(answer);
                 ResponseAnswer responseAnswer = new ResponseAnswer(
                         request,
-                        self(),
-                        newRouting,
+                        newPath,
                         newAnswers,
                         request.constraints,
                         request.unifiers
@@ -166,14 +161,15 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private void respondDoneToRequester(final Request request) {
-        if (request.routing.responsePath.isEmpty()) {
+        if (request.path.atRoot()) {
             // base case - how to return from Actor model
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             LOG.debug("Sending DONE response to output from actor: " + name);
             responses.add(-1L);
         } else {
-            Actor<AtomicActor> requester = request.routing.getRequester();
-            ResponseDone responseDone = new ResponseDone(request, self());
+            Actor<AtomicActor> requester = request.path.directUpstream();
+            Path newPath = request.path.moveUpstream();
+            ResponseDone responseDone = new ResponseDone(request, newPath);
             LOG.debug("Responding Done to requester from actor: " + name);
             requester.tell((actor) -> actor.receiveDone(responseDone));
         }
@@ -192,7 +188,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        Actor<AtomicActor> downstream = request.routing.downstream();
+        Actor<AtomicActor> downstream = request.path.directDownstream();
         ResponseProducer responseProducer = new ResponseProducer(downstream);
 
         if (!responseProducer.hasDownstream()) {
@@ -242,23 +238,23 @@ class ResponseProducer {
         return downstream == null && traversalProducers.isEmpty();
     }
 
-    public void downstreamDone(final Actor<AtomicActor> responder) {
+    public void downstreamDone() {
         downstream = null;
     }
 }
 
 
 class Request {
-    final Routing routing;
+    final Path path;
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
 
-    public Request(Routing routing,
+    public Request(Path path,
                    List<Long> partialAnswers,
                    List<Object> constraints,
                    List<Object> unifiers) {
-        this.routing = routing;
+        this.path = path;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
@@ -269,7 +265,7 @@ class Request {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Request request = (Request) o;
-        return Objects.equals(routing, request.routing) &&
+        return Objects.equals(path, request.path) &&
                 Objects.equals(partialAnswers, request.partialAnswers) &&
                 Objects.equals(constraints, request.constraints) &&
                 Objects.equals(unifiers, request.unifiers);
@@ -277,23 +273,22 @@ class Request {
 
     @Override
     public int hashCode() {
-        return Objects.hash(routing, partialAnswers, constraints, unifiers);
+        return Objects.hash(path, partialAnswers, constraints, unifiers);
     }
 }
 
 
 interface Response {
     Request request();
-    Actor<AtomicActor> responder();
 }
 
 class ResponseDone implements Response {
     private final Request request;
-    private final Actor<AtomicActor> responder;
+    final Path path;
 
-    public ResponseDone(final Request request, final Actor<AtomicActor> responder) {
+    public ResponseDone(final Request request, final Path path) {
         this.request = request;
-        this.responder = responder;
+        this.path = path;
     }
 
     @Override
@@ -301,30 +296,22 @@ class ResponseDone implements Response {
         return request;
     }
 
-    @Override
-    public Actor<AtomicActor> responder() {
-        return responder;
-    }
 }
 
 class ResponseAnswer implements Response {
-    final Routing routing;
+    final Path path;
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
     private final Request request;
-    private final Actor<AtomicActor> responder;
 
     public ResponseAnswer(final Request request,
-                          final Actor<AtomicActor> responder,
-                          final Routing routing,
+                          final Path path,
                           final List<Long> partialAnswers,
                           final List<Object> constraints,
                           final List<Object> unifiers) {
-        assert routing.requestPath.size() == 0 : "response answer must have an empty requestPath";
         this.request = request;
-        this.responder = responder;
-        this.routing = routing;
+        this.path = path;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
@@ -335,67 +322,61 @@ class ResponseAnswer implements Response {
         return request;
     }
 
-    @Override
-    public Actor<AtomicActor> responder() {
-        return responder;
-    }
 }
 
-class Routing {
-    List<Actor<AtomicActor>> responsePath;
-    List<Actor<AtomicActor>> requestPath;
+class Path {
+    List<Actor<AtomicActor>> completePath;
+    int current = 0;
 
-    public Routing(List<Actor<AtomicActor>> responsePath, List<Actor<AtomicActor>> requestPath) {
-        this.responsePath = responsePath;
-        this.requestPath = requestPath;
+    public Path(List<Actor<AtomicActor>> initialDownstream) {
+        completePath = new ArrayList<>(initialDownstream);
     }
 
-    public Routing copy() {
-        return new Routing(new ArrayList<>(responsePath), new ArrayList<>(requestPath));
+    boolean atRoot() {
+        return current == 0;
     }
 
-    public void trimRequestPath() {
-        assert requestPath.size() >= 1 : "can't trim a path object that's already empty";
-        requestPath.remove(requestPath.size()-1);
+    boolean atEnd() {
+        return current == completePath.size() - 1;
     }
 
-    public void clearRequestPath() {
-        requestPath.clear();
+    public Actor<AtomicActor> directUpstream() {
+        return completePath.get(current - 1);
     }
 
-    public void extendResponsePath(Actor<AtomicActor> respondTo) {
-        responsePath.add(respondTo);
+    public Actor<AtomicActor> directDownstream() {
+        if (current == completePath.size() - 1) return null;
+        return completePath.get(current + 1);
     }
 
-    public void trimResponsePath() {
-        assert responsePath.size() >= 1 : "can't trim a path object that's already empty";
-        responsePath.remove(responsePath.size()-1);
+    void addDownstream(Actor<AtomicActor> downstream) {
+        completePath.add(downstream);
     }
 
-
-    @Nullable public Actor<AtomicActor> downstream() {
-        if (requestPath.size() >= 2) {
-            return requestPath.get(requestPath.size()-2);
-        }
-        return null;
+    Path moveDownstream() {
+        Path path = new Path(completePath);
+        path.current = this.current + 1;
+        assert path.current < completePath.size() : "Moved downstream past end of path";
+        return path;
     }
 
-    public Actor<AtomicActor> getRequester() {
-        assert responsePath.size() >= 1 : "can't get the last element of responsePath as it's empty";
-        return responsePath.get(responsePath.size() - 1);
+    Path moveUpstream() {
+        Path path = new Path(completePath);
+        path.current = this.current - 1;
+        assert path.current >= 0 : "Moved upstream past beginning of path";
+        return path;
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Routing routing = (Routing) o;
-        return Objects.equals(responsePath, routing.responsePath) &&
-                Objects.equals(requestPath, routing.requestPath);
+        final Path path = (Path) o;
+        return current == path.current && Objects.equals(completePath, path.completePath);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(responsePath, requestPath);
+        return Objects.hash(completePath, current);
     }
 }

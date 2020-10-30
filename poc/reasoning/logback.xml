@@ -1,40 +1,14 @@
-<!--
-  ~ Copyright (C) 2020 Grakn Labs
-  ~
-  ~ This program is free software: you can redistribute it and/or modify
-  ~ it under the terms of the GNU Affero General Public License as
-  ~ published by the Free Software Foundation, either version 3 of the
-  ~ License, or (at your option) any later version.
-  ~
-  ~ This program is distributed in the hope that it will be useful,
-  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
-  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  ~ GNU Affero General Public License for more details.
-  ~
-  ~ You should have received a copy of the GNU Affero General Public License
-  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
-
-<configuration debug="false" scan="true" scanPeriod="30 seconds">
-
+<configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %magenta(%X{address}) %X{currentTime} %yellow(%logger{10}) %-5level %cyan([%thread]) - %msg%n</pattern>
         </encoder>
     </appender>
-
-    <root level="WARN"/>
-
-    <!--    <logger name="grakn.core.server.rpc" level="DEBUG" />-->
-
-<!--    &lt;!&ndash;-->
-<!--    TRACE: (Extremely verbose reporting events that gives complete traceability of a server operation)-->
-<!--    DEBUG: (Verbose reporting events that gives a deeper understanding of server operations)-->
-<!--    INFO:  (Reporting events that identifies the progress of server operations)-->
-<!--    WARN:  (Unexpected events that are not recommended to have happened)-->
-<!--    ERROR: (Incorrect events that disrupts the server operation, against user expectation)-->
-<!--    &ndash;&gt;-->
-<!--    <logger name="grakn.core" level="INFO">-->
-<!--        <appender-ref ref="STDOUT"/>-->
-<!--    </logger>-->
+    <!--
+      enable this line in order to change log level selectively, for a particular java package
+      <logger name="grakn.cluster" level="DEBUG" />
+    -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
 </configuration>
