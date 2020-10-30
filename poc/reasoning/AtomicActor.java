@@ -38,17 +38,17 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
         // TODO if we want batching, we increment by as many as are requested
-        responseProducer.requested++;
+        responseProducer.requestsFromUpstream++;
 
-        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
+        if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
             respondAnswersToRequester(request, responseProducer);
         }
 
-        if (responseProducer.requested > responseProducer.dispatched + responseProducer.answers.size()) {
-            if (responseProducer.dependency != null) {
-                requestFromDependency(request, responseProducer);
+        if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+            if (responseProducer.downstream != null) {
+                requestFromDownstream(request, responseProducer);
             }
         }
 
@@ -75,13 +75,11 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
 
         Actor<AtomicActor> responder = done.responder();
-        responseProducer.dependencyDone(responder);
+        responseProducer.downstream(responder);
 
         if (responseProducer.finished()) {
             respondDoneToRequester(parentRequest);
         }
-
-
         /*
         TODO: major flaw here is that when we get a DONE, we have fewer messages dispatched which should have
         TODO: lead to answers to the original request. To compensate, we should "retry" getting answers
@@ -89,8 +87,8 @@ public class AtomicActor extends Actor.State<AtomicActor> {
          */
     }
 
-    private void requestFromDependency(final Request request, final ResponseProducer responseProducer) {
-        Actor<AtomicActor> dependency = responseProducer.dependency;
+    private void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
+        Actor<AtomicActor> downstream = responseProducer.downstream;
         Routing newRouting = request.routing.copy();
         newRouting.extendResponsePath(self());
         newRouting.trimRequestPath();
@@ -104,12 +102,12 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         // TODO we may overwrite if multiple identical requests are sent
         requestRouter.put(subrequest, request);
 
-        dependency.tell(actor -> actor.receiveRequest(subrequest));
+        downstream.tell(actor -> actor.receiveRequest(subrequest));
     }
 
     private void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
-        for (int i = 0; i < Math.min(responseProducer.requested, responseProducer.answers.size()); i++) {
+        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
             if (request.routing.responsePath.isEmpty()) {
                 // base case - how to return from Actor model
@@ -133,7 +131,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
                 requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
-            responseProducer.requested--;
+            responseProducer.requestsFromUpstream--;
         }
     }
 
@@ -156,10 +154,10 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        Actor<AtomicActor> dependency = request.routing.getNextToRequestFrom();
-        ResponseProducer responseProducer = new ResponseProducer(dependency);
+        Actor<AtomicActor> downstream = request.routing.downstream();
+        ResponseProducer responseProducer = new ResponseProducer(downstream);
 
-        if (!responseProducer.hasDependency()) {
+        if (!responseProducer.hasDownstream()) {
             registerTraversal(responseProducer, 0L);
         }
 
@@ -174,14 +172,14 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
 class ResponseProducer {
     List<Iterator<Long>> traversalProducers;
-    @Nullable Actor<AtomicActor> dependency = null; // null if there is no dependency or if dependency exhausted
+    @Nullable Actor<AtomicActor> downstream = null; // null if there is no downstream or if downstream exhausted
     List<Long> answers = new LinkedList<>();
-    int requested = 0;
-    int dispatched = 0;
+    int requestsFromUpstream = 0;
+    int requestsToDownstream = 0;
 
-    public ResponseProducer(@Nullable Actor<AtomicActor> dependency) {
+    public ResponseProducer(@Nullable Actor<AtomicActor> downstream) {
         this.traversalProducers = new ArrayList<>();
-        this.dependency = dependency;
+        this.downstream = downstream;
     }
 
     public void addTraversalProducer(Iterator<Long> traversalProducer) {
@@ -198,17 +196,17 @@ class ResponseProducer {
         traversalProducers.remove(traversalProducer);
     }
 
-    public boolean hasDependency() {
-        return dependency != null;
+    public boolean hasDownstream() {
+        return downstream != null;
     }
 
     public boolean finished() {
-        return dependency == null && traversalProducers.isEmpty();
+        return downstream == null && traversalProducers.isEmpty();
     }
 
-    public void dependencyDone(final Actor<AtomicActor> responder) {
-        assert dependency == responder;
-        dependency = null;
+    public void downstream(final Actor<AtomicActor> responder) {
+        assert downstream == responder;
+        downstream = null;
     }
 }
 
@@ -333,7 +331,7 @@ class Routing {
         responsePath.remove(responsePath.size()-1);
     }
 
-    @Nullable public Actor<AtomicActor> getNextToRequestFrom() {
+    @Nullable public Actor<AtomicActor> downstream() {
         if (requestPath.size() >= 2) {
             return requestPath.get(requestPath.size()-2);
         }
