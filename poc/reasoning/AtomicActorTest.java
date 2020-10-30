@@ -25,7 +25,7 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(Arrays.asList(), Arrays.asList(subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Routing(Arrays.asList(), Arrays.asList(subAtomic, atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
             answers.take();
@@ -47,7 +47,7 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(Arrays.asList(), Arrays.asList(subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Routing(Arrays.asList(), Arrays.asList(subAtomic, atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -74,7 +74,7 @@ public class AtomicActorTest {
         for (int i = 0; i < n; i++) {
             atomic.tell(actor ->
                     actor.receiveRequest(
-                            new Request(Arrays.asList(), Arrays.asList(subAtomic3, subAtomic2, subAtomic1, subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Routing(Arrays.asList(), Arrays.asList(subAtomic3, subAtomic2, subAtomic1, subAtomic, atomic)), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
