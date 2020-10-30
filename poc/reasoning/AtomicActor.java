@@ -13,49 +13,58 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static junit.framework.TestCase.assertTrue;
+
 public class AtomicActor extends Actor.State<AtomicActor> {
 
     private final Map<Request, ResponseProducer> requestProducers;
     private final Map<Request, Request> requestRouter; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
+    private final String name;
     private final Long traversalPattern;
     private final long traversalIteratorLength;
-    @Nullable private final LinkedBlockingQueue<Long> answers;
+    @Nullable private final LinkedBlockingQueue<Long> responses;
 
-    public AtomicActor(final Actor<AtomicActor> self, Long traversalPattern, final long traversalIteratorLength, final @Nullable LinkedBlockingQueue<Long> answers) {
+    public AtomicActor(final Actor<AtomicActor> self, final String name, Long traversalPattern, final long traversalIteratorLength, final @Nullable LinkedBlockingQueue<Long> responses) {
         super(self);
+        this.name = name;
         this.traversalPattern = traversalPattern;
         this.traversalIteratorLength = traversalIteratorLength;
-        this.answers = answers;
+        this.responses = responses;
         // the query pattern long represents some thing to pass to a traversal or resolve further
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
 
     public void receiveRequest(final Request request) {
+        System.out.println("Received request in: " + name);
         if (!this.requestProducers.containsKey(request)) {
             this.requestProducers.put(request, initialiseResponseProducer(request));
         }
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
-        // TODO if we want batching, we increment by as many as are requested
-        responseProducer.requestsFromUpstream++;
-
-        if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-            List<Long> answers = produceTraversalAnswers(responseProducer);
-            responseProducer.answers.addAll(answers);
-            respondAnswersToRequester(request, responseProducer);
-        }
-
-        if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-            if (responseProducer.downstream != null) {
-                requestFromDownstream(request, responseProducer);
-            }
-        }
 
         if (responseProducer.finished()) respondDoneToRequester(request);
+        else {
+            // TODO if we want batching, we increment by as many as are requested
+            responseProducer.requestsFromUpstream++;
+
+            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+                List<Long> answers = produceTraversalAnswers(responseProducer);
+                responseProducer.answers.addAll(answers);
+                respondAnswersToRequester(request, responseProducer);
+            }
+
+            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+                if (responseProducer.downstream != null) {
+                    requestFromDownstream(request, responseProducer);
+                }
+            }
+        }
     }
 
     public void receiveAnswer(final ResponseAnswer answer) {
+        System.out.println("Received answer response in: " + name);
+        assertTrue(responses.isEmpty());
         Request sourceSubRequest = answer.request();
         Request parentRequest = requestRouter.get(sourceSubRequest);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
@@ -70,12 +79,17 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     public void receiveDone(final ResponseDone done) {
+        System.out.println("Received done response in: " + name);
         Request sourceSubRequest = done.request();
         Request parentRequest = requestRouter.get(sourceSubRequest);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
 
         Actor<AtomicActor> responder = done.responder();
-        responseProducer.downstream(responder);
+        responseProducer.downstreamDone(responder);
+
+        List<Long> answers = produceTraversalAnswers(responseProducer);
+        responseProducer.answers.addAll(answers);
+        respondAnswersToRequester(parentRequest, responseProducer);
 
         if (responseProducer.finished()) {
             respondDoneToRequester(parentRequest);
@@ -102,6 +116,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         // TODO we may overwrite if multiple identical requests are sent
         requestRouter.put(subrequest, request);
 
+        System.out.println("Requesting from downstream from: " + name);
         downstream.tell(actor -> actor.receiveRequest(subrequest));
     }
 
@@ -111,8 +126,9 @@ public class AtomicActor extends Actor.State<AtomicActor> {
             Long answer = responseProducer.answers.remove(0);
             if (request.routing.responsePath.isEmpty()) {
                 // base case - how to return from Actor model
-                assert answers != null : this + ": can't return answers because the user answers queue is null";
-                answers.add(answer);
+                assert responses != null : this + ": can't return answers because the user answers queue is null";
+                System.out.println("Saving answer to output queue in actor: " + name);
+                responses.add(answer);
             } else {
                 Actor<AtomicActor> requester = request.routing.getRequester();
                 Routing newRouting = request.routing.copy();
@@ -129,6 +145,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
                         request.unifiers
                 );
 
+                System.out.println("Responding answer to requester from actor: " + name);
                 requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
             responseProducer.requestsFromUpstream--;
@@ -136,9 +153,17 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private void respondDoneToRequester(final Request request) {
-        Actor<AtomicActor> requester = request.routing.getRequester();
-        ResponseDone responseDone = new ResponseDone(request, self());
-        requester.tell((actor) -> actor.receiveDone(responseDone));
+        if (request.routing.responsePath.isEmpty()) {
+            // base case - how to return from Actor model
+            assert responses != null : this + ": can't return answers because the user answers queue is null";
+            System.out.println("Sending DONE response to output from actor: " + name);
+            responses.add(-1L);
+        } else {
+            Actor<AtomicActor> requester = request.routing.getRequester();
+            ResponseDone responseDone = new ResponseDone(request, self());
+            System.out.println("Responding Done to requester from actor: " + name);
+            requester.tell((actor) -> actor.receiveDone(responseDone));
+        }
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
@@ -204,8 +229,7 @@ class ResponseProducer {
         return downstream == null && traversalProducers.isEmpty();
     }
 
-    public void downstream(final Actor<AtomicActor> responder) {
-        assert downstream == responder;
+    public void downstreamDone(final Actor<AtomicActor> responder) {
         downstream = null;
     }
 }
