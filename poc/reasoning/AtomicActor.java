@@ -13,10 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class Reasoning {
-}
-
-class AtomicActor extends Actor.State<AtomicActor> {
+public class AtomicActor extends Actor.State<AtomicActor> {
 
     private final Map<Request, ResponseProducer> requests;
     private final Map<Request, Request> subrequests; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)

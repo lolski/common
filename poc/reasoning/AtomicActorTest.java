@@ -11,11 +11,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import static junit.framework.TestCase.assertTrue;
 
-public class ReasoningTest {
+public class AtomicActorTest {
     @Test
     public void basic() throws InterruptedException {
         LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(AtomicActor.class, "main"));
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
         Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2L, 2L, answers))).await();
         Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20L, 2L, null))).await();
@@ -37,7 +37,7 @@ public class ReasoningTest {
     @Test
     public void shallowRerequest() throws InterruptedException {
         LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(AtomicActor.class, "main"));
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
         Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2L, 2L, answers))).await();
         Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20L, 2L, null))).await();
@@ -61,7 +61,7 @@ public class ReasoningTest {
     @Test
     public void deepRerequest() throws InterruptedException {
         LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(AtomicActor.class, "main"));
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
         Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2L, 10L, answers))).await();
         Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20L, 10L, answers))).await();

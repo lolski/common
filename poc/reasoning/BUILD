@@ -17,8 +17,8 @@
 
 java_test(
     name = "reasoning-test",
-    test_class = "grakn.common.poc.reasoning.ReasoningTest",
-    srcs = ["MockTransaction.java", "Reasoning.java", "ReasoningTest.java"],
+    test_class = "grakn.common.poc.reasoning.AtomicActorTest",
+    srcs = ["MockTransaction.java", "AtomicActor.java", "AtomicActorTest.java"],
     deps = [
         "//:common",
         "@maven//:com_google_code_findbugs_jsr305"
