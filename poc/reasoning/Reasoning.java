@@ -1,9 +1,6 @@
 package grakn.common.poc.reasoning;
 
-import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.concurrent.actor.ActorRoot;
-import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -17,33 +14,6 @@ import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Reasoning {
-    public static LinkedBlockingQueue<Long> answers = new LinkedBlockingQueue<>();
-
-    public static void main(String[] args) throws InterruptedException {
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(Reasoning.class, "main"));
-        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
-        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2L))).await();
-        Actor<AtomicActor> subAtomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20L))).await();
-        Actor<AtomicActor> subAtomic1 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 200L))).await();
-        Actor<AtomicActor> subAtomic2 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 2000L))).await();
-        Actor<AtomicActor> subAtomic3 = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, 20000L))).await();
-
-        long startTime = System.currentTimeMillis();
-        int n = 1000;
-        for (int i = 0; i < n; i++) {
-            atomic.tell(actor ->
-                    actor.receiveRequest(
-                            new Request(Arrays.asList(), Arrays.asList(subAtomic3, subAtomic2, subAtomic1, subAtomic, atomic), Arrays.asList(), Arrays.asList(), Arrays.asList())
-                    )
-            );
-        }
-        for (int i = 0; i < n; i++) {
-            answers.take();
-        }
-        System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        System.out.println(answers.take());
-        System.out.println("should not be printed");
-    }
 }
 
 class AtomicActor extends Actor.State<AtomicActor> {
@@ -51,10 +21,14 @@ class AtomicActor extends Actor.State<AtomicActor> {
     private final Map<Request, ResponseProducer> requests;
     private final Map<Request, Request> subrequests; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
     private final Long queryPattern;
+    private final long txIteratorLength;
+    @Nullable private final LinkedBlockingQueue<Long> answers;
 
-    public AtomicActor(final Actor<AtomicActor> self, Long queryPattern) {
+    public AtomicActor(final Actor<AtomicActor> self, Long queryPattern, long txIteratorLength, @Nullable LinkedBlockingQueue<Long> answers) {
         super(self);
         this.queryPattern = queryPattern;
+        this.txIteratorLength = txIteratorLength;
+        this.answers = answers;
         // the query pattern long represents some thing to pass to a traversal or resolve further
         requests = new HashMap<>();
         subrequests = new HashMap<>();
@@ -129,7 +103,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
         List<Long> partialAnswers = answer.partialAnswers;
         Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
 
-        Iterator<Long> traversal = (new MockTransaction(10, 1)).query(mergedAnswers);
+        Iterator<Long> traversal = (new MockTransaction(txIteratorLength, 1)).query(mergedAnswers);
         responseProducer.addTraversalProducer(traversal);
 
         List<Long> answers = produceTraversalAnswers(responseProducer);
@@ -160,7 +134,8 @@ class AtomicActor extends Actor.State<AtomicActor> {
             Long answer = responseProducer.answers.remove(0);
             if (request.returnPath.isEmpty()) {
                 // base case - how to return from Actor model
-                Reasoning.answers.add(answer);
+                assert answers != null : this + ": can't return answers because the user answers queue is null";
+                answers.add(answer);
             } else {
                 Actor<AtomicActor> requester = request.returnPath.get(request.returnPath.size() - 1);
 
@@ -197,7 +172,7 @@ class AtomicActor extends Actor.State<AtomicActor> {
 
         ResponseProducer responseProducer = new ResponseProducer(dependency);
         if (!responseProducer.hasDependency()) {
-            Iterator<Long> traversal = (new MockTransaction(10, 1)).query(0L);
+            Iterator<Long> traversal = (new MockTransaction(txIteratorLength, 1)).query(0L);
             responseProducer.addTraversalProducer(traversal);
         }
 

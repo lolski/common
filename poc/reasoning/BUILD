@@ -15,10 +15,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-java_binary(
-    name = "reasoning",
-    main_class = "grakn.common.poc.reasoning.Reasoning",
-    srcs = ["MockTransaction.java", "Reasoning.java"],
+java_test(
+    name = "reasoning-test",
+    test_class = "grakn.common.poc.reasoning.ReasoningTest",
+    srcs = ["MockTransaction.java", "Reasoning.java", "ReasoningTest.java"],
     deps = [
         "//:common",
         "@maven//:com_google_code_findbugs_jsr305"
