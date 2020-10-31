@@ -12,7 +12,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class AtomicActor extends Actor.State<AtomicActor> {
@@ -58,8 +57,8 @@ public class AtomicActor extends Actor.State<AtomicActor> {
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                if (responseProducer.downstream != null) {
-                    requestFromDownstream(request, responseProducer);
+                if (!responseProducer.isDownstreamDone()) {
+                    requestFromDownstream(request);
                 }
             }
         }
@@ -70,7 +69,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     We map the request that generated the answer, to the originating request.
     We then copy the originating request, and clear the request path, as it must already have been satisfied.
      */
-    public void receiveAnswer(final ResponseAnswer answer) {
+    public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
         Request sourceSubRequest = answer.request();
         Request parentRequest = requestRouter.get(sourceSubRequest);
@@ -85,13 +84,13 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         respondAnswersToRequester(parentRequest, responseProducer);
     }
 
-    public void receiveDone(final ResponseDone done) {
+    public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
         Request sourceSubRequest = done.request();
         Request parentRequest = requestRouter.get(sourceSubRequest);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
 
-        responseProducer.downstreamDone();
+        responseProducer.setDownstreamDone();
 
         if (responseProducer.finished()) {
             respondDoneToRequester(parentRequest);
@@ -110,8 +109,9 @@ public class AtomicActor extends Actor.State<AtomicActor> {
          */
     }
 
-    private void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
-        Actor<AtomicActor> downstream = responseProducer.downstream;
+    private void requestFromDownstream(final Request request) {
+        // TODO open question - should downstream requests increment "requested" field?
+        Actor<AtomicActor> downstream = request.path.directDownstream();
         Path downstreamPath = request.path.moveDownstream();
         Request subrequest = new Request(
                 downstreamPath,
@@ -120,7 +120,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
                 request.unifiers
         );
 
-        // TODO we may overwrite if multiple identical requests are sent
+        // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(subrequest, request);
 
         LOG.debug("Requesting from downstream from: " + name);
@@ -145,7 +145,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
                 List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
                 newAnswers.addAll(request.partialAnswers);
                 newAnswers.add(answer);
-                ResponseAnswer responseAnswer = new ResponseAnswer(
+                Response.Answer responseAnswer = new Response.Answer(
                         request,
                         newPath,
                         newAnswers,
@@ -169,7 +169,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         } else {
             Actor<AtomicActor> requester = request.path.directUpstream();
             Path newPath = request.path.moveUpstream();
-            ResponseDone responseDone = new ResponseDone(request, newPath);
+            Response.Done responseDone = new Response.Done(request, newPath);
             LOG.debug("Responding Done to requester from actor: " + name);
             requester.tell((actor) -> actor.receiveDone(responseDone));
         }
@@ -188,10 +188,10 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        Actor<AtomicActor> downstream = request.path.directDownstream();
-        ResponseProducer responseProducer = new ResponseProducer(downstream);
+        boolean downstreamExists = request.path.directDownstream() != null;
+        ResponseProducer responseProducer = new ResponseProducer(downstreamExists);
 
-        if (!responseProducer.hasDownstream()) {
+        if (!responseProducer.isDownstreamDone()) {
             registerTraversal(responseProducer, 0L);
         }
 
@@ -206,14 +206,14 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
 class ResponseProducer {
     List<Iterator<Long>> traversalProducers;
-    @Nullable Actor<AtomicActor> downstream = null; // null if there is no downstream or if downstream exhausted
+    boolean downstreamDone;
     List<Long> answers = new LinkedList<>();
     int requestsFromUpstream = 0;
     int requestsToDownstream = 0;
 
-    public ResponseProducer(@Nullable Actor<AtomicActor> downstream) {
+    public ResponseProducer(boolean hasDownstream) {
         this.traversalProducers = new ArrayList<>();
-        this.downstream = downstream;
+        this.downstreamDone = !hasDownstream;
     }
 
     public void addTraversalProducer(Iterator<Long> traversalProducer) {
@@ -229,154 +229,21 @@ class ResponseProducer {
     public void removeTraversalProducer(Iterator<Long> traversalProducer) {
         traversalProducers.remove(traversalProducer);
     }
-
-    public boolean hasDownstream() {
-        return downstream != null;
-    }
-
     public boolean finished() {
-        return downstream == null && traversalProducers.isEmpty();
+        return downstreamDone == true && traversalProducers.isEmpty();
     }
 
-    public void downstreamDone() {
-        downstream = null;
-    }
-}
-
-
-class Request {
-    final Path path;
-    final List<Long> partialAnswers;
-    final List<Object> constraints;
-    final List<Object> unifiers;
-
-    public Request(Path path,
-                   List<Long> partialAnswers,
-                   List<Object> constraints,
-                   List<Object> unifiers) {
-        this.path = path;
-        this.partialAnswers = partialAnswers;
-        this.constraints = constraints;
-        this.unifiers = unifiers;
+    public void setDownstreamDone() {
+        downstreamDone = true;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Request request = (Request) o;
-        return Objects.equals(path, request.path) &&
-                Objects.equals(partialAnswers, request.partialAnswers) &&
-                Objects.equals(constraints, request.constraints) &&
-                Objects.equals(unifiers, request.unifiers);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(path, partialAnswers, constraints, unifiers);
-    }
-}
-
-
-interface Response {
-    Request request();
-}
-
-class ResponseDone implements Response {
-    private final Request request;
-    final Path path;
-
-    public ResponseDone(final Request request, final Path path) {
-        this.request = request;
-        this.path = path;
-    }
-
-    @Override
-    public Request request() {
-        return request;
+    public boolean isDownstreamDone() {
+        return downstreamDone;
     }
 
 }
 
-class ResponseAnswer implements Response {
-    final Path path;
-    final List<Long> partialAnswers;
-    final List<Object> constraints;
-    final List<Object> unifiers;
-    private final Request request;
 
-    public ResponseAnswer(final Request request,
-                          final Path path,
-                          final List<Long> partialAnswers,
-                          final List<Object> constraints,
-                          final List<Object> unifiers) {
-        this.request = request;
-        this.path = path;
-        this.partialAnswers = partialAnswers;
-        this.constraints = constraints;
-        this.unifiers = unifiers;
-    }
 
-    @Override
-    public Request request() {
-        return request;
-    }
 
-}
 
-class Path {
-    List<Actor<AtomicActor>> completePath;
-    int current = 0;
-
-    public Path(List<Actor<AtomicActor>> initialDownstream) {
-        completePath = new ArrayList<>(initialDownstream);
-    }
-
-    boolean atRoot() {
-        return current == 0;
-    }
-
-    boolean atEnd() {
-        return current == completePath.size() - 1;
-    }
-
-    public Actor<AtomicActor> directUpstream() {
-        return completePath.get(current - 1);
-    }
-
-    public Actor<AtomicActor> directDownstream() {
-        if (current == completePath.size() - 1) return null;
-        return completePath.get(current + 1);
-    }
-
-    void addDownstream(Actor<AtomicActor> downstream) {
-        completePath.add(downstream);
-    }
-
-    Path moveDownstream() {
-        Path path = new Path(completePath);
-        path.current = this.current + 1;
-        assert path.current < completePath.size() : "Moved downstream past end of path";
-        return path;
-    }
-
-    Path moveUpstream() {
-        Path path = new Path(completePath);
-        path.current = this.current - 1;
-        assert path.current >= 0 : "Moved upstream past beginning of path";
-        return path;
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        final Path path = (Path) o;
-        return current == path.current && Objects.equals(completePath, path.completePath);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(completePath, current);
-    }
-}
