@@ -7,7 +7,7 @@ import java.util.Arrays;
 
 import static junit.framework.TestCase.assertTrue;
 
-public class AtomicActorTest {
+public class ReasoningTest {
     @Test
     public void singleActor() throws InterruptedException {
         ActorManager manager = new ActorManager();
