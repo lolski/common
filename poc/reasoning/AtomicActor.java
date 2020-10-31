@@ -165,7 +165,7 @@ public class AtomicActor extends Actor.State<AtomicActor> implements ReasoningAc
         boolean downstreamExists = request.path.directDownstream() != null;
         ResponseProducer responseProducer = new ResponseProducer(downstreamExists);
 
-        if (!responseProducer.isDownstreamDone()) {
+        if (responseProducer.isDownstreamDone()) {
             registerTraversal(responseProducer, 0L);
         }
 
