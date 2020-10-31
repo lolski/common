@@ -17,7 +17,7 @@
 
 java_test(
     name = "reasoning-test",
-    test_class = "grakn.common.poc.reasoning.AtomicActorTest",
+    test_class = "grakn.common.poc.reasoning.ReasoningTest",
     srcs = glob(["*.java"]),
     deps = [
         "//:common",
