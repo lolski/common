@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.Objects;
 
 public class Path {
-    List<Actor<AtomicActor>> completePath;
+    List<Actor<? extends ReasoningActor<?>>> completePath;
     int current = 0;
 
-    public Path(List<Actor<AtomicActor>> initialDownstream) {
+    public Path(List<Actor<? extends ReasoningActor<?>>> initialDownstream) {
         completePath = new ArrayList<>(initialDownstream);
     }
 
@@ -23,11 +23,11 @@ public class Path {
         return current == completePath.size() - 1;
     }
 
-    public Actor<AtomicActor> directUpstream() {
+    public Actor<? extends ReasoningActor<?>> directUpstream() {
         return completePath.get(current - 1);
     }
 
-    public Actor<AtomicActor> directDownstream() {
+    public Actor<? extends ReasoningActor<?>> directDownstream() {
         if (current == completePath.size() - 1) return null;
         return completePath.get(current + 1);
     }

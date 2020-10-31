@@ -12,11 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class ConjunctiveActor extends Actor.State<ConjunctiveActor> implements ReasoningActor {
+public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private final String name;
     Logger LOG;
 
     private final List<Long> conjunction;
+    final Path path; // TODO open for tests
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
     private final Map<Request, ResponseProducer> requestProducers;
@@ -31,9 +32,8 @@ public class ConjunctiveActor extends Actor.State<ConjunctiveActor> implements R
         this.conjunction = conjunction;
         this.responses = responses;
 
-        List<Actor<AtomicActor>> reverseOrderedActors = new ArrayList<>();
-        // TODO make generics so that this accepts all reasoning actors
-//        reverseOrderedActors.add(self);
+        List<Actor<? extends ReasoningActor<?>>> reverseOrderedActors = new ArrayList<>();
+        reverseOrderedActors.add(self);
         List<Long> plan = plan(this.conjunction);
         Collections.reverse(plan);
         // in the future, we'll check if the atom is rule resolvable first
@@ -43,8 +43,7 @@ public class ConjunctiveActor extends Actor.State<ConjunctiveActor> implements R
             reverseOrderedActors.add(actor);
         }
 
-        Path path = new Path(reverseOrderedActors);
-
+        path = new Path(reverseOrderedActors);
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
@@ -89,7 +88,7 @@ public class ConjunctiveActor extends Actor.State<ConjunctiveActor> implements R
     }
 
     private void requestFromDownstream(final Request request) {
-        Actor<AtomicActor> downstream = request.path.directDownstream();
+        Actor<? extends ReasoningActor<?>> downstream = request.path.directDownstream();
         Path downstreamPath = request.path.moveDownstream();
         Request subrequest = new Request(
                 downstreamPath,
@@ -141,6 +140,6 @@ public class ConjunctiveActor extends Actor.State<ConjunctiveActor> implements R
      */
     private List<Long> plan(List<Long> conjunction) {
         // plan the atomics in the conjunction
-        return conjunction;
+        return new ArrayList<>(conjunction);
     }
 }

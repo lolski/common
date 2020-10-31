@@ -55,6 +55,7 @@ public class AtomicActorTest {
     @Test
     public void shallowRerequest() throws InterruptedException {
         ActorManager manager = new ActorManager();
+        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(200L, 20L, 2L));
         Actor<AtomicActor> atomic = manager.createAtomicActor(2L, 1L);
         Actor<AtomicActor> subAtomic1 = manager.createAtomicActor(20L, 1L);
         Actor<AtomicActor> subAtomic2 = manager.createAtomicActor(200L, 1L);
@@ -62,9 +63,10 @@ public class AtomicActorTest {
         long startTime = System.currentTimeMillis();
         int n = 5;
         for (int i = 0; i < n; i++) {
-            atomic.tell(actor ->
+            conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(new Path(Arrays.asList(atomic, subAtomic1, subAtomic2)), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            // TODO UNDO HACK
+                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }

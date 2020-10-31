@@ -11,7 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public class AtomicActor extends Actor.State<AtomicActor> implements ReasoningActor {
+public class AtomicActor extends ReasoningActor<AtomicActor> {
     Logger LOG;
 
     private final Map<Request, ResponseProducer> requestProducers;
@@ -102,7 +102,7 @@ public class AtomicActor extends Actor.State<AtomicActor> implements ReasoningAc
 
     private void requestFromDownstream(final Request request) {
         // TODO open question - should downstream requests increment "requested" field?
-        Actor<AtomicActor> downstream = request.path.directDownstream();
+        Actor<? extends ReasoningActor<?>> downstream = request.path.directDownstream();
         Path downstreamPath = request.path.moveDownstream();
         Request subrequest = new Request(
                 downstreamPath,
@@ -122,7 +122,7 @@ public class AtomicActor extends Actor.State<AtomicActor> implements ReasoningAc
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            Actor<AtomicActor> requester = request.path.directUpstream();
+            Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
             Path newPath = request.path.moveUpstream();
             List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
             newAnswers.addAll(request.partialAnswers);
@@ -142,7 +142,7 @@ public class AtomicActor extends Actor.State<AtomicActor> implements ReasoningAc
     }
 
     private void respondDoneToRequester(final Request request) {
-        Actor<AtomicActor> requester = request.path.directUpstream();
+        Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
         Path newPath = request.path.moveUpstream();
         Response.Done responseDone = new Response.Done(request, newPath);
         LOG.debug("Responding Done to requester from actor: " + name);

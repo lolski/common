@@ -51,7 +51,7 @@ public class Actor<STATE extends Actor.State<STATE>> {
         }
     }
 
-    private STATE state;
+    public STATE state;
     private final EventLoop eventLoop;
 
     private Actor(EventLoop eventLoop) {
