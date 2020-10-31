@@ -27,6 +27,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     public AtomicActor(final Actor<AtomicActor> self, final String name, Long traversalPattern, final long traversalIteratorLength, final @Nullable LinkedBlockingQueue<Long> responses) {
         super(self);
         LOG = LoggerFactory.getLogger(AtomicActor.class + "-" + name);
+
         this.name = name;
         this.traversalPattern = traversalPattern;
         this.traversalIteratorLength = traversalIteratorLength;
@@ -71,8 +72,8 @@ public class AtomicActor extends Actor.State<AtomicActor> {
      */
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
-        Request sourceSubRequest = answer.request();
-        Request parentRequest = requestRouter.get(sourceSubRequest);
+        Request request = answer.request();
+        Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
 
         List<Long> partialAnswers = answer.partialAnswers;
@@ -86,8 +87,8 @@ public class AtomicActor extends Actor.State<AtomicActor> {
 
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
-        Request sourceSubRequest = done.request();
-        Request parentRequest = requestRouter.get(sourceSubRequest);
+        Request request = done.request();
+        Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
 
         responseProducer.setDownstreamDone();
@@ -99,14 +100,6 @@ public class AtomicActor extends Actor.State<AtomicActor> {
             responseProducer.answers.addAll(answers);
             respondAnswersToRequester(parentRequest, responseProducer);
         }
-
-
-
-        /*
-        TODO: major flaw here is that when we get a DONE, we have fewer messages dispatched which should have
-        TODO: lead to answers to the original request. To compensate, we should "retry" getting answers
-        TODO: either from another actor, or a local traversal from the list of local traversals
-         */
     }
 
     private void requestFromDownstream(final Request request) {
