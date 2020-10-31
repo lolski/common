@@ -4,17 +4,14 @@ import grakn.common.concurrent.actor.Actor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
 
-public class AtomicActor extends Actor.State<AtomicActor> {
+public class AtomicActor extends Actor.State<AtomicActor> implements ReasoningActor {
     Logger LOG;
 
     private final Map<Request, ResponseProducer> requestProducers;
@@ -22,21 +19,20 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     private final String name;
     private final Long traversalPattern;
     private final long traversalIteratorLength;
-    @Nullable private final LinkedBlockingQueue<Long> responses;
 
-    public AtomicActor(final Actor<AtomicActor> self, final String name, Long traversalPattern, final long traversalIteratorLength, final @Nullable LinkedBlockingQueue<Long> responses) {
+    public AtomicActor(final Actor<AtomicActor> self, Long traversalPattern, final long traversalIteratorLength) {
         super(self);
-        LOG = LoggerFactory.getLogger(AtomicActor.class + "-" + name);
+        LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + traversalPattern);
 
-        this.name = name;
+        this.name = "AtomicActor(pattern: " + traversalPattern + ")";
         this.traversalPattern = traversalPattern;
         this.traversalIteratorLength = traversalIteratorLength;
-        this.responses = responses;
         // the query pattern long represents some thing to pass to a traversal or resolve further
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
 
+    @Override
     public void receiveRequest(final Request request) {
         LOG.debug("Received request in: " + name);
         if (!this.requestProducers.containsKey(request)) {
@@ -70,6 +66,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
     We map the request that generated the answer, to the originating request.
     We then copy the originating request, and clear the request path, as it must already have been satisfied.
      */
+    @Override
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
@@ -85,6 +82,7 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         respondAnswersToRequester(parentRequest, responseProducer);
     }
 
+    @Override
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
@@ -120,52 +118,35 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         downstream.tell(actor -> actor.receiveRequest(subrequest));
     }
 
-    /*
-    when we respond to a request with an answer, must trim requestPath
-     */
     private void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            if (request.path.atRoot()) {
-                // base case - how to return from Actor model
-                assert responses != null : this + ": can't return answers because the user answers queue is null";
-                LOG.debug("Saving answer to output queue in actor: " + name);
-                responses.add(answer);
-            } else {
-                Actor<AtomicActor> requester = request.path.directUpstream();
-                Path newPath = request.path.moveUpstream();
-                List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
-                newAnswers.addAll(request.partialAnswers);
-                newAnswers.add(answer);
-                Response.Answer responseAnswer = new Response.Answer(
-                        request,
-                        newPath,
-                        newAnswers,
-                        request.constraints,
-                        request.unifiers
-                );
+            Actor<AtomicActor> requester = request.path.directUpstream();
+            Path newPath = request.path.moveUpstream();
+            List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
+            newAnswers.addAll(request.partialAnswers);
+            newAnswers.add(answer);
+            Response.Answer responseAnswer = new Response.Answer(
+                    request,
+                    newPath,
+                    newAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
 
-                LOG.debug("Responding answer to requester from actor: " + name);
-                requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
-            }
+            LOG.debug("Responding answer to requester from actor: " + name);
+            requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
             responseProducer.requestsFromUpstream--;
         }
     }
 
     private void respondDoneToRequester(final Request request) {
-        if (request.path.atRoot()) {
-            // base case - how to return from Actor model
-            assert responses != null : this + ": can't return answers because the user answers queue is null";
-            LOG.debug("Sending DONE response to output from actor: " + name);
-            responses.add(-1L);
-        } else {
-            Actor<AtomicActor> requester = request.path.directUpstream();
-            Path newPath = request.path.moveUpstream();
-            Response.Done responseDone = new Response.Done(request, newPath);
-            LOG.debug("Responding Done to requester from actor: " + name);
-            requester.tell((actor) -> actor.receiveDone(responseDone));
-        }
+        Actor<AtomicActor> requester = request.path.directUpstream();
+        Path newPath = request.path.moveUpstream();
+        Response.Done responseDone = new Response.Done(request, newPath);
+        LOG.debug("Responding Done to requester from actor: " + name);
+        requester.tell((actor) -> actor.receiveDone(responseDone));
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
@@ -195,45 +176,6 @@ public class AtomicActor extends Actor.State<AtomicActor> {
         Iterator<Long> traversal = (new MockTransaction(traversalIteratorLength, 1)).query(partialAnswer);
         responseProducer.addTraversalProducer(traversal);
     }
-}
-
-class ResponseProducer {
-    List<Iterator<Long>> traversalProducers;
-    boolean downstreamDone;
-    List<Long> answers = new LinkedList<>();
-    int requestsFromUpstream = 0;
-    int requestsToDownstream = 0;
-
-    public ResponseProducer(boolean hasDownstream) {
-        this.traversalProducers = new ArrayList<>();
-        this.downstreamDone = !hasDownstream;
-    }
-
-    public void addTraversalProducer(Iterator<Long> traversalProducer) {
-        traversalProducers.add(traversalProducer);
-    }
-
-    @Nullable
-    public Iterator<Long> getOneTraversalProducer() {
-        if (!traversalProducers.isEmpty()) return traversalProducers.get(0);
-        return null;
-    }
-
-    public void removeTraversalProducer(Iterator<Long> traversalProducer) {
-        traversalProducers.remove(traversalProducer);
-    }
-    public boolean finished() {
-        return downstreamDone == true && traversalProducers.isEmpty();
-    }
-
-    public void setDownstreamDone() {
-        downstreamDone = true;
-    }
-
-    public boolean isDownstreamDone() {
-        return downstreamDone;
-    }
-
 }
 
 

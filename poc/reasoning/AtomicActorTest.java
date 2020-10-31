@@ -11,7 +11,7 @@ public class AtomicActorTest {
     @Test
     public void singleActor() throws InterruptedException {
         ActorManager manager = new ActorManager();
-        Actor<AtomicActor> atomic = manager.createAtomicActor("A", 0L, 2L, true);
+        Actor<AtomicActor> atomic = manager.createAtomicActor(0L, 2L);
 
         long startTime = System.currentTimeMillis();
         int n = 5;
@@ -31,8 +31,8 @@ public class AtomicActorTest {
     @Test
     public void basic() throws InterruptedException {
         ActorManager manager = new ActorManager();
-        Actor<AtomicActor> atomic = manager.createAtomicActor( "B", 2L, 2L, true);
-        Actor<AtomicActor> subAtomic = manager.createAtomicActor("A", 20L, 2L, false);
+        Actor<AtomicActor> atomic = manager.createAtomicActor(2L, 2L);
+        Actor<AtomicActor> subAtomic = manager.createAtomicActor(20L, 2L);
 
         long startTime = System.currentTimeMillis();
         int n = 4;
@@ -55,9 +55,9 @@ public class AtomicActorTest {
     @Test
     public void shallowRerequest() throws InterruptedException {
         ActorManager manager = new ActorManager();
-        Actor<AtomicActor> atomic = manager.createAtomicActor( "3", 2L, 1L, true);
-        Actor<AtomicActor> subAtomic1 = manager.createAtomicActor( "2", 20L, 1L, false);
-        Actor<AtomicActor> subAtomic2 = manager.createAtomicActor( "1", 200L, 1L, false);
+        Actor<AtomicActor> atomic = manager.createAtomicActor(2L, 1L);
+        Actor<AtomicActor> subAtomic1 = manager.createAtomicActor(20L, 1L);
+        Actor<AtomicActor> subAtomic2 = manager.createAtomicActor(200L, 1L);
 
         long startTime = System.currentTimeMillis();
         int n = 5;
@@ -79,11 +79,11 @@ public class AtomicActorTest {
     public void deepRerequest() throws InterruptedException {
         ActorManager manager = new ActorManager();
 
-        Actor<AtomicActor> atomic = manager.createAtomicActor(  "5", 2L, 10L, true);
-        Actor<AtomicActor> subAtomic = manager.createAtomicActor( "4", 20L, 10L, false);
-        Actor<AtomicActor> subAtomic1 = manager.createAtomicActor( "3", 200L, 10L, false);
-        Actor<AtomicActor> subAtomic2 = manager.createAtomicActor( "2", 2000L, 10L, false);
-        Actor<AtomicActor> subAtomic3 = manager.createAtomicActor( "1", 20000L, 10L, false);
+        Actor<AtomicActor> atomic = manager.createAtomicActor(2L, 10L);
+        Actor<AtomicActor> subAtomic = manager.createAtomicActor(20L, 10L);
+        Actor<AtomicActor> subAtomic1 = manager.createAtomicActor(200L, 10L);
+        Actor<AtomicActor> subAtomic2 = manager.createAtomicActor(2000L, 10L);
+        Actor<AtomicActor> subAtomic3 = manager.createAtomicActor(20000L, 10L);
 
         long startTime = System.currentTimeMillis();
         int n = 10000;
