@@ -11,8 +11,10 @@ public class AtomicActorTest {
     @Test
     public void singleActor() throws InterruptedException {
         ActorManager manager = new ActorManager();
+
+        // create atomic actors first to control answer size
+        manager.createAtomicActor(0L, 5L);
         Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(0L));
-        manager.createAtomicActor(0L, 2L);
 
         long startTime = System.currentTimeMillis();
         int n = 5;
@@ -32,9 +34,11 @@ public class AtomicActorTest {
     @Test
     public void basic() throws InterruptedException {
         ActorManager manager = new ActorManager();
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(20L, 2L));
+
+        // create atomic actors first to control answer size
         manager.createAtomicActor(2L, 2L);
         manager.createAtomicActor(20L, 2L);
+        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(20L, 2L));
 
         long startTime = System.currentTimeMillis();
         int n = 4;
@@ -45,7 +49,7 @@ public class AtomicActorTest {
                     )
             );
         }
-        Thread.sleep(1000);
+//        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
         manager.takeAnswer();
         manager.takeAnswer();
         manager.takeAnswer();
@@ -57,11 +61,13 @@ public class AtomicActorTest {
     @Test
     public void shallowRerequest() throws InterruptedException {
         ActorManager manager = new ActorManager();
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(200L, 20L, 2L));
-        manager.createAtomicActor(2L, 1L);
-        manager.createAtomicActor(20L, 1L);
-        manager.createAtomicActor(200L, 1L);
 
+        // create atomic actors first to control answer size
+        manager.createAtomicActor(2L, 2L);
+        manager.createAtomicActor(20L, 2L);
+        manager.createAtomicActor(200L, 2L);
+
+        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(200L, 20L, 2L));
         long startTime = System.currentTimeMillis();
         int n = 5;
         for (int i = 0; i < n; i++) {
@@ -83,12 +89,13 @@ public class AtomicActorTest {
     public void deepRerequest() throws InterruptedException {
         ActorManager manager = new ActorManager();
 
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(20000L, 2000L, 200L, 20L, 2L));
+        // create atomic actors first to control answer size
         manager.createAtomicActor(2L, 10L);
         manager.createAtomicActor(20L, 10L);
         manager.createAtomicActor(200L, 10L);
         manager.createAtomicActor(2000L, 10L);
         manager.createAtomicActor(20000L, 10L);
+        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(20000L, 2000L, 200L, 20L, 2L));
 
         long startTime = System.currentTimeMillis();
         int n = 10000;

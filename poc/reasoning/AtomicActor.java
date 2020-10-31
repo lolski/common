@@ -72,6 +72,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         Request request = answer.request();
         Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        responseProducer.requestsToDownstream--;
 
         List<Long> partialAnswers = answer.partialAnswers;
         Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
@@ -88,6 +89,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         Request request = done.request();
         Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        responseProducer.requestsToDownstream--;
 
         responseProducer.setDownstreamDone();
 

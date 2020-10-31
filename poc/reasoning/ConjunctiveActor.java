@@ -78,13 +78,28 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     @Override
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
+        Request request = answer.request();
+        Request parentRequest = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        responseProducer.requestsToDownstream--;
 
+        // directly pass answer response back after combining into a single answer
+        List<Long> partialAnswers = answer.partialAnswers;
+        Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
+        responseProducer.answers.add(mergedAnswers);
+        respondAnswersToRequester(parentRequest, responseProducer);
     }
 
     @Override
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
+        Request request = done.request();
+        Request parentRequest = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        responseProducer.requestsToDownstream--;
 
+        responseProducer.setDownstreamDone();
+        respondAnswersToRequester(parentRequest, responseProducer);
     }
 
     private void requestFromDownstream(final Request request) {
