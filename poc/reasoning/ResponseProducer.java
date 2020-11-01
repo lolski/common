@@ -31,8 +31,11 @@ class ResponseProducer {
     public void removeTraversalProducer(Iterator<Long> traversalProducer) {
         traversalProducers.remove(traversalProducer);
     }
+
     public boolean finished() {
-        return downstreamDone == true && traversalProducers.isEmpty();
+        boolean finished = downstreamDone && traversalProducers.isEmpty();
+        if (finished) assert answers.isEmpty() : "Downstream and traversalProducers are finished, answers should already be sent";
+        return finished;
     }
 
     public void setDownstreamDone() {

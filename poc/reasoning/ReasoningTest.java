@@ -14,7 +14,7 @@ public class ReasoningTest {
 
         // create atomic actors first to control answer size
         manager.createAtomicActor(0L, 5L);
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(0L), 5L);
+        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(0L), 5L);
 
         long startTime = System.currentTimeMillis();
         int n = 10;
@@ -38,7 +38,7 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         manager.createAtomicActor(2L, 2L);
         manager.createAtomicActor(20L, 2L);
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(20L, 2L), 0L);
+        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(20L, 2L), 0L);
 
         long startTime = System.currentTimeMillis();
         int n = 4;
@@ -67,7 +67,7 @@ public class ReasoningTest {
         manager.createAtomicActor(20L, 2L);
         manager.createAtomicActor(200L, 2L);
 
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(200L, 20L, 2L), 0L);
+        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(200L, 20L, 2L), 0L);
         long startTime = System.currentTimeMillis();
         int n = 5;
         for (int i = 0; i < n; i++) {
@@ -95,7 +95,7 @@ public class ReasoningTest {
         manager.createAtomicActor(200L, 10L);
         manager.createAtomicActor(2000L, 10L);
         manager.createAtomicActor(20000L, 10L);
-        Actor<ConjunctiveActor> conjunctive = manager.createConjunctiveActor(Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L);
+        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L);
 
         long startTime = System.currentTimeMillis();
         int n = 10000;

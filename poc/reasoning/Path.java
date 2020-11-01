@@ -32,7 +32,7 @@ public class Path {
         return completePath.get(current + 1);
     }
 
-    void addDownstream(Actor<AtomicActor> downstream) {
+    void addDownstream(Actor<? extends ReasoningActor<?>> downstream) {
         completePath.add(downstream);
     }
 
@@ -61,5 +61,11 @@ public class Path {
     @Override
     public int hashCode() {
         return Objects.hash(completePath, current);
+    }
+
+    public Path extend(final Actor<ConjunctiveActor> whenActor) {
+        Path path = new Path(completePath);
+        path.completePath.add(whenActor);
+        return path;
     }
 }

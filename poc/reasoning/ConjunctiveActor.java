@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
@@ -25,7 +24,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
     private final Map<Request, ResponseProducer> requestProducers;
-    private final Map<Request, Request> requestRouter; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
+    private final Map<Request, Request> requestRouter;
 
 
     protected ConjunctiveActor(final Actor<ConjunctiveActor> self, ActorManager manager, List<Long> conjunction,
