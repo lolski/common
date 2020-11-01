@@ -93,6 +93,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
         responseProducer.requestsToDownstream--;
 
+        // every conjunction has exactly 1 downstream, so a done message must indicate the downstream is done
         responseProducer.setDownstreamDone();
 
         if (responseProducer.finished()) {
@@ -117,7 +118,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(subrequest, request);
 
-        LOG.debug("Requesting from downstream from: " + name);
+        LOG.debug("Requesting from downstream in: " + name);
         downstream.tell(actor -> actor.receiveRequest(subrequest));
         requestProducers.get(request).requestsToDownstream++;
     }
@@ -129,10 +130,21 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             if (request.path.atRoot()) {
                 // base case - how to return from Actor model
                 assert responses != null : this + ": can't return answers because the user answers queue is null";
-                LOG.debug("Saving answer to output queue in actor: " + name);
+                LOG.debug("Saving answer to output queue in: " + name);
                 responses.add(answer);
             } else {
-                // TODO
+                Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
+                Path newPath = request.path.moveUpstream();
+                Response.Answer responseAnswer = new Response.Answer(
+                        request,
+                        newPath,
+                        Arrays.asList(answer),
+                        request.constraints,
+                        request.unifiers
+                );
+
+                LOG.debug("Responding answer to requester in: " + name);
+                requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
             responseProducer.requestsFromUpstream--;
         }
@@ -142,10 +154,14 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         if (request.path.atRoot()) {
             // base case - how to return from Actor model
             assert responses != null : this + ": can't return answers because the user answers queue is null";
-            LOG.debug("Sending DONE response to output from actor: " + name);
+            LOG.debug("Writing Done to output queue in: " + name);
             responses.add(-1L);
         } else {
-            // TODO
+            Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
+            Path newPath = request.path.moveUpstream();
+            Response.Done responseDone = new Response.Done(request, newPath);
+            LOG.debug("Responding Done to requester in: " + name);
+            requester.tell((actor) -> actor.receiveDone(responseDone));
         }
     }
 
