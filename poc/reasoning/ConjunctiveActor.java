@@ -6,44 +6,38 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
-    private final String name;
     Logger LOG;
 
+    private final String name;
     private final List<Long> conjunction;
     final Path path; // TODO open for tests
+    private final Long traversalSize;
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
     private final Map<Request, ResponseProducer> requestProducers;
     private final Map<Request, Request> requestRouter; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
 
 
-    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, ActorManager manager, List<Long> conjunction, LinkedBlockingQueue<Long> responses) throws InterruptedException {
+    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, ActorManager manager, List<Long> conjunction,
+                               Long traversalSize, LinkedBlockingQueue<Long> responses) throws InterruptedException {
         super(self);
         LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + conjunction);
 
-        this.name = "Conjunction-" + conjunction;
+        this.name = "ConjunctiveActor(pattern:" + conjunction + ")";
         this.conjunction = conjunction;
+        this.traversalSize = traversalSize;
         this.responses = responses;
-
-        List<Actor<? extends ReasoningActor<?>>> reverseOrderedActors = new ArrayList<>();
-        reverseOrderedActors.add(self);
-        List<Long> plan = plan(this.conjunction);
-        Collections.reverse(plan);
-        // in the future, we'll check if the atom is rule resolvable first
-        for (Long atomicConstraint : plan) {
-            Actor<AtomicActor> actor = manager.getAtomicActor(atomicConstraint);
-            if (actor == null) actor = manager.createAtomicActor(atomicConstraint, 5L);
-            reverseOrderedActors.add(actor);
-        }
-
-        path = new Path(reverseOrderedActors);
+        this.path = plan(manager, this.conjunction);
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
@@ -52,8 +46,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     public void receiveRequest(final Request request) {
         LOG.debug("Received request in: " + name);
         if (!this.requestProducers.containsKey(request)) {
-            boolean downstreamExists = request.path.directDownstream() != null;
-            this.requestProducers.put(request, new ResponseProducer(downstreamExists));
+            this.requestProducers.put(request, initialiseResponseProducer(request));
         }
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
@@ -64,6 +57,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             responseProducer.requestsFromUpstream++;
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+                List<Long> answers = produceTraversalAnswers(responseProducer);
+                responseProducer.answers.addAll(answers);
                 respondAnswersToRequester(request, responseProducer);
             }
 
@@ -99,7 +94,14 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         responseProducer.requestsToDownstream--;
 
         responseProducer.setDownstreamDone();
-        respondAnswersToRequester(parentRequest, responseProducer);
+
+        if (responseProducer.finished()) {
+            respondDoneToRequester(parentRequest);
+        } else {
+            List<Long> answers = produceTraversalAnswers(responseProducer);
+            responseProducer.answers.addAll(answers);
+            respondAnswersToRequester(parentRequest, responseProducer);
+        }
     }
 
     private void requestFromDownstream(final Request request) {
@@ -147,14 +149,45 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
     }
 
+    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
+        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
+        if (traversalProducer != null) {
+            // TODO could do batch traverse, or retrieve answers from multiple traversals
+            Long answer = traversalProducer.next();
+            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
+            return Arrays.asList(answer);
+        }
+        return Arrays.asList();
+    }
+
 
     /*
     Given a conjunction, return an ordered list of constraints to traverse
     The first constraint should be the starting point that finds initial answers
     before propagating them in the order indicated by the plan
      */
-    private List<Long> plan(List<Long> conjunction) {
+    private Path plan(ActorManager manager, List<Long> conjunction) throws InterruptedException {
+        List<Long> planned = new ArrayList<>(conjunction);
+        Collections.reverse(planned);
+        List<Actor<? extends ReasoningActor<?>>> planAsActors = new ArrayList<>();
+        planAsActors.add(self());
+        // in the future, we'll check if the atom is rule resolvable first
+        for (Long atomicConstraint : planned) {
+            Actor<AtomicActor> actor = manager.getAtomicActor(atomicConstraint);
+            if (actor == null) actor = manager.createAtomicActor(atomicConstraint, 5L);
+            planAsActors.add(actor);
+        }
+
         // plan the atomics in the conjunction
-        return new ArrayList<>(conjunction);
+        return new Path(planAsActors);
+    }
+
+    private ResponseProducer initialiseResponseProducer(final Request request) {
+        boolean downstreamExists = request.path.directDownstream() != null;
+        ResponseProducer responseProducer = new ResponseProducer(downstreamExists);
+        Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
+        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
+        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
+        return responseProducer;
     }
 }

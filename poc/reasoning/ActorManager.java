@@ -27,10 +27,10 @@ public class ActorManager {
         rootActor = Actor.root(eventLoop, ActorRoot::new);
     }
 
-    public Actor<ConjunctiveActor> createConjunctiveActor(List<Long> conjunction) throws InterruptedException {
+    public Actor<ConjunctiveActor> createConjunctiveActor(List<Long> conjunction, long traversalSize) throws InterruptedException {
         Actor<ConjunctiveActor> conjunctive = rootActor.ask(root -> root.<ConjunctiveActor>createActor(self -> {
             try {
-                return new ConjunctiveActor(self, this, conjunction, responses);
+                return new ConjunctiveActor(self, this, conjunction, traversalSize, responses);
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 LOG.error("Failed to create conjunctive actor: " + conjunction);
@@ -40,8 +40,8 @@ public class ActorManager {
         return conjunctive;
     }
 
-    public Actor<AtomicActor> createAtomicActor(Long traversalPattern, Long traversalAnswerSize) throws InterruptedException {
-        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, traversalPattern, traversalAnswerSize))).await();
+    public Actor<AtomicActor> createAtomicActor(Long traversalPattern, Long traversalSize) throws InterruptedException {
+        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, traversalPattern, traversalSize))).await();
         atomicActors.put(traversalPattern, atomic);
         return atomic;
     }

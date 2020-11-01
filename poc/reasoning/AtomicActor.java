@@ -14,20 +14,19 @@ import java.util.Map;
 public class AtomicActor extends ReasoningActor<AtomicActor> {
     Logger LOG;
 
-    private final Map<Request, ResponseProducer> requestProducers;
-    private final Map<Request, Request> requestRouter; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
     private final String name;
     private final Long traversalPattern;
-    private final long traversalIteratorLength;
+    private final long traversalSize;
+    private final Map<Request, ResponseProducer> requestProducers;
+    private final Map<Request, Request> requestRouter; // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
 
-    public AtomicActor(final Actor<AtomicActor> self, Long traversalPattern, final long traversalIteratorLength) {
+    public AtomicActor(final Actor<AtomicActor> self, Long traversalPattern, final long traversalSize) {
         super(self);
         LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + traversalPattern);
 
         this.name = "AtomicActor(pattern: " + traversalPattern + ")";
         this.traversalPattern = traversalPattern;
-        this.traversalIteratorLength = traversalIteratorLength;
-        // the query pattern long represents some thing to pass to a traversal or resolve further
+        this.traversalSize = traversalSize;
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
@@ -175,12 +174,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private void registerTraversal(ResponseProducer responseProducer, long partialAnswer) {
-        Iterator<Long> traversal = (new MockTransaction(traversalIteratorLength, 1)).query(partialAnswer);
+        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(partialAnswer);
         responseProducer.addTraversalProducer(traversal);
     }
 }
-
-
-
-
 
