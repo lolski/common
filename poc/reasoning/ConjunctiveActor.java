@@ -105,7 +105,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
     }
 
-    private void requestFromDownstream(final Request request) {
+    @Override
+    void requestFromDownstream(final Request request) {
         Actor<? extends ReasoningActor<?>> downstream = request.path.directDownstream();
         Path downstreamPath = request.path.moveDownstream();
         Request subrequest = new Request(
@@ -123,7 +124,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         requestProducers.get(request).requestsToDownstream++;
     }
 
-    private void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
+    @Override
+    void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
@@ -150,7 +152,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
     }
 
-    private void respondDoneToRequester(final Request request) {
+    @Override
+    void respondDoneToRequester(final Request request) {
         if (request.path.atRoot()) {
             // base case - how to return from Actor model
             assert responses != null : this + ": can't return answers because the user answers queue is null";
@@ -175,7 +178,6 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
         return Arrays.asList();
     }
-
 
     /*
     Given a conjunction, return an ordered list of constraints to traverse

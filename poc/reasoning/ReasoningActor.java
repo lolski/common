@@ -8,10 +8,15 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
         super(self);
     }
 
-    abstract void receiveRequest(final Request request);
+    public abstract void receiveRequest(final Request request);
 
-    abstract void receiveAnswer(final Response.Answer answer);
+    public abstract void receiveAnswer(final Response.Answer answer);
 
-    abstract void receiveDone(final Response.Done done);
+    public abstract void receiveDone(final Response.Done done);
 
+    abstract void requestFromDownstream(final Request request);
+
+    abstract void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer);
+
+    abstract void respondDoneToRequester(final Request request);
 }

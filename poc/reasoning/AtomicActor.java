@@ -101,7 +101,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
     }
 
-    private void requestFromDownstream(final Request request) {
+    @Override
+    void requestFromDownstream(final Request request) {
         // TODO open question - should downstream requests increment "requested" field?
         Actor<? extends ReasoningActor<?>> downstream = request.path.directDownstream();
         Path downstreamPath = request.path.moveDownstream();
@@ -119,7 +120,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         downstream.tell(actor -> actor.receiveRequest(subrequest));
     }
 
-    private void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
+    @Override
+    void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
@@ -142,7 +144,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
     }
 
-    private void respondDoneToRequester(final Request request) {
+    @Override
+    void respondDoneToRequester(final Request request) {
         Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
         Path newPath = request.path.moveUpstream();
         Response.Done responseDone = new Response.Done(request, newPath);
