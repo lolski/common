@@ -191,7 +191,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicConstraint : planned) {
             Actor<AtomicActor> actor = manager.getAtomicActor(atomicConstraint);
-            if (actor == null) actor = manager.createAtomicActor(atomicConstraint, 5L);
+            if (actor == null) actor = manager.createAtomicActor(atomicConstraint, 5L, Arrays.asList());
             planAsActors.add(actor);
         }
 

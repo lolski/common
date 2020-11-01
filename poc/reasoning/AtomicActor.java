@@ -21,16 +21,26 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     // TODO EH???? what is the below comment
     // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
     private final Map<Request, Request> requestRouter;
+    private final List<Actor<RuleActor>> ruleActors;
 
-    public AtomicActor(final Actor<AtomicActor> self, Long traversalPattern, final long traversalSize) {
+    public AtomicActor(final Actor<AtomicActor> self, ActorManager manager, Long traversalPattern, final long traversalSize, List<List<Long>> rules) throws InterruptedException {
         super(self);
-        LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + traversalPattern);
+        LOG = LoggerFactory.getLogger(AtomicActor.class.getSimpleName() + "-" + traversalPattern);
 
         this.name = "AtomicActor(pattern: " + traversalPattern + ")";
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
+        ruleActors = createRuleActors(manager, rules);
+    }
+
+    private List<Actor<RuleActor>> createRuleActors(final ActorManager manager, final List<List<Long>> rules) throws InterruptedException {
+        final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
+        for (List<Long> rule : rules) {
+            ruleActors.add(manager.createRuleActor(rule, 1L));
+        }
+        return ruleActors;
     }
 
     @Override

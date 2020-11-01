@@ -20,7 +20,6 @@ public class ActorManager {
     private LinkedBlockingQueue<Long> responses;
 
     public ActorManager() {
-
         atomicActors = new HashMap<>();
         responses = new LinkedBlockingQueue<>();
         EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(AtomicActor.class, "main"));
@@ -32,10 +31,9 @@ public class ActorManager {
             try {
                 return new ConjunctiveActor(self, this, conjunction, traversalSize, responses);
             } catch (InterruptedException e) {
-                e.printStackTrace();
                 LOG.error("Failed to create conjunctive actor: " + conjunction);
+                throw new RuntimeException(e);
             }
-            return null;
         })).await();
         return conjunctive;
     }
@@ -45,18 +43,37 @@ public class ActorManager {
             try {
                 return new ConjunctiveActor(self, this, conjunction, traversalSize, null);
             } catch (InterruptedException e) {
-                e.printStackTrace();
                 LOG.error("Failed to create conjunctive actor: " + conjunction);
+                throw new RuntimeException(e);
             }
-            return null;
         })).await();
         return conjunctive;
     }
 
-    public Actor<AtomicActor> createAtomicActor(Long traversalPattern, Long traversalSize) throws InterruptedException {
-        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> new AtomicActor(self, traversalPattern, traversalSize))).await();
+    public Actor<AtomicActor> createAtomicActor(Long traversalPattern, Long traversalSize, List<List<Long>> rules) throws InterruptedException {
+        Actor<AtomicActor> atomic = rootActor.ask(root -> root.<AtomicActor>createActor((self) -> {
+            try {
+                return new AtomicActor(self, this, traversalPattern, traversalSize, rules);
+            } catch (InterruptedException e) {
+                LOG.error("Failed to create atomic actor: " + traversalPattern);
+                throw new RuntimeException(e);
+            }
+        })).await();
+        assert !atomicActors.containsKey(traversalPattern);
         atomicActors.put(traversalPattern, atomic);
         return atomic;
+    }
+
+    public Actor<RuleActor> createRuleActor(final List<Long> whenPattern, final long traversalSize) throws InterruptedException {
+        Actor<RuleActor> actor = rootActor.ask(root -> root.<RuleActor>createActor(self -> {
+            try {
+                return new RuleActor(self, this, whenPattern, traversalSize);
+            } catch (InterruptedException e) {
+                LOG.error("Failed to create rule actor: " + whenPattern);
+                throw new RuntimeException(e);
+            }
+        })).await();
+        return actor;
     }
 
     public Actor<AtomicActor> getAtomicActor(Long traversalPattern) {
@@ -70,4 +87,5 @@ public class ActorManager {
     public boolean hasAnswer() {
         return !responses.isEmpty();
     }
+
 }

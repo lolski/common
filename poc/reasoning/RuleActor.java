@@ -4,7 +4,6 @@ import grakn.common.concurrent.actor.Actor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -18,12 +17,12 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     private final Map<Request, Request> requestRouter;
     private final String name;
 
-    public RuleActor(final Actor<RuleActor> self, ActorManager manager, String ruleName, List<Long> when,
+    public RuleActor(final Actor<RuleActor> self, ActorManager manager, List<Long> when,
                      Long whenTraversalSize) throws InterruptedException {
         super(self);
-        LOG = LoggerFactory.getLogger(RuleActor.class.getSimpleName() + "-" + ruleName);
+        LOG = LoggerFactory.getLogger(RuleActor.class.getSimpleName() + "-" + when);
 
-        this.name = String.format("RuleActor[%s](pattern:%s)", ruleName, ruleName);
+        this.name = String.format("RuleActor(pattern:%s)", when);
         whenActor = manager.createConjunctiveActor(when, whenTraversalSize);
         requestRouter = new HashMap<>();
         requestProducers = new HashMap<>();
