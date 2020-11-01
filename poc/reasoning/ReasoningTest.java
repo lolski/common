@@ -60,6 +60,7 @@ public class ReasoningTest {
 
     @Test
     public void simpleRule() throws InterruptedException {
+        // check TODO in ReasoningActor for why this is stalling
         ActorManager manager = new ActorManager();
 
         // create atomic actors first to control answer size
@@ -84,6 +85,35 @@ public class ReasoningTest {
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(!manager.hasAnswer());
     }
+
+    @Test
+    public void atomicChainWithRule() throws InterruptedException {
+        ActorManager manager = new ActorManager();
+
+        // create atomic actors first to control answer size
+        Actor<AtomicActor> bottomAtomic = manager.createAtomicActor(-2L, 4L, Arrays.asList());
+        Actor<AtomicActor> atomicWithRule = manager.createAtomicActor(2L, 4L, Arrays.asList(Arrays.asList(-2L)));
+        Actor<AtomicActor> atomic = manager.createAtomicActor(20L, 4L, Arrays.asList());
+        Actor<ConjunctiveActor> rootConjunction = manager.createRootConjunctiveActor(Arrays.asList(20L, 2L), 0L);
+
+        long startTime = System.currentTimeMillis();
+        int n = 4;
+        for (int i = 0; i < n; i++) {
+            rootConjunction.tell(actor ->
+                    actor.receiveRequest(
+                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                    )
+            );
+        }
+//        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
+        manager.takeAnswer();
+        manager.takeAnswer();
+        manager.takeAnswer();
+        manager.takeAnswer();
+        System.out.println("Time : " + (System.currentTimeMillis() - startTime));
+        assertTrue(!manager.hasAnswer());
+    }
+
 
     @Test
     public void shallowRerequest() throws InterruptedException {
