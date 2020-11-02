@@ -2,6 +2,8 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.concurrent.actor.Actor;
 
+import java.util.List;
+
 public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.State<T>{
 
     final ActorRegistry actorRegistry;
@@ -19,7 +21,13 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
 
     abstract void requestFromDownstream(final Request request);
 
-    abstract void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer);
+    abstract void respondAnswersToUpstream(final Request request,
+                                           final Plan plan,
+                                           final List<Long> partialAnswers,
+                                           final List<Object> constraints,
+                                           final List<Object> unifiers,
+                                           final ResponseProducer responseProducer,
+                                           final Actor<? extends ReasoningActor<?>> upstream);
 
     abstract void respondDoneToUpstream(final Request request);
 

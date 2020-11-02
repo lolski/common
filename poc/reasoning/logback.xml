@@ -8,7 +8,7 @@
       enable this line in order to change log level selectively, for a particular java package
       <logger name="grakn.cluster" level="DEBUG" />
     -->
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

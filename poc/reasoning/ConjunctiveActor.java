@@ -58,7 +58,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
-                respondAnswersToUpstream(request, responseProducer);
+                respondAnswersToUpstream(answer.plan.endStepCompleted(), request, responseProducer);
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -81,7 +81,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         List<Long> partialAnswers = answer.partialAnswers;
         Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
         responseProducer.answers.add(mergedAnswers);
-        respondAnswersToUpstream(parentRequest, responseProducer);
+        respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
-            respondAnswersToUpstream(parentRequest, responseProducer);
+            respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
         }
     }
 
@@ -124,7 +124,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(Plan plan, final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);

@@ -63,7 +63,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
-                respondAnswersToUpstream(request, responseProducer);
+                respondAnswersToUpstream();
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -93,7 +93,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         List<Long> answers = produceTraversalAnswers(responseProducer);
         responseProducer.answers.addAll(answers);
-        respondAnswersToUpstream(parentRequest, responseProducer);
+
+        Plan shortenedPlan = answer.plan.endStepCompleted();
+
+        respondAnswersToUpstream(parentRequest, shortenedPlan, parentRequest.partialAnswers,
+                parentRequest.constraints, parentRequest.unifiers, responseProducer, parentRequest.plan.previousStep());
     }
 
     @Override
@@ -111,7 +115,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
-            respondAnswersToUpstream(parentRequest, responseProducer);
+            respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
         }
     }
 
@@ -135,21 +139,26 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(
+            final Request request,
+            final Plan plan,
+            final List<Long> partialAnswers,
+            final List<Object> constraints,
+            final List<Object> unifiers,
+            final ResponseProducer responseProducer,
+            final Actor<? extends ReasoningActor<?>> upstream
+    ) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
-            Plan shortenedPlan = request.plan.endStepCompleted();
-            List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
-            newAnswers.addAll(request.partialAnswers);
+            List<Long> newAnswers = new ArrayList<>(partialAnswers);
             newAnswers.add(answer);
             Response.Answer responseAnswer = new Response.Answer(
                     request,
-                    shortenedPlan,
+                    plan,
                     newAnswers,
-                    request.constraints,
-                    request.unifiers
+                    constraints,
+                    unifiers
             );
 
             LOG.debug("Responding answer to upstream from actor: " + name);

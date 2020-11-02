@@ -34,7 +34,7 @@ public class Plan {
     Plan endStepCompleted() {
         assert current == plan.size() - 1 : "Can only complete the end step if it is the last step of the plan";
 
-        Plan plan = new Plan(this.plan);
+        Plan plan = new Plan(this.plan.subList(0, this.plan.size() - 1));
         plan.current = this.current - 1;
         assert plan.current >= 0 : "Trying to move to before the beginning of the plan";
         return plan;

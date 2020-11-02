@@ -44,7 +44,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             responseProducer.requestsFromUpstream++;
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                respondAnswersToUpstream(request, responseProducer);
+                respondAnswersToUpstream(answer.plan.endStepCompleted(), request, responseProducer);
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -62,7 +62,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
         responseProducer.requestsToDownstream--;
-        respondAnswersToUpstream(parentRequest, responseProducer);
+        respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
 
         // TODO unify and materialise
     }
@@ -80,7 +80,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         if (responseProducer.finished()) {
             respondDoneToUpstream(parentRequest);
         } else {
-            respondAnswersToUpstream(parentRequest, responseProducer);
+            respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
         }
     }
 
@@ -103,7 +103,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(Plan plan, final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
