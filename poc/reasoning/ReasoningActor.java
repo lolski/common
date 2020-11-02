@@ -19,8 +19,8 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
 
     abstract void requestFromDownstream(final Request request);
 
-    abstract void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer);
+    abstract void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer);
 
-    abstract void respondDoneToRequester(final Request request);
+    abstract void respondDoneToUpstream(final Request request);
 
 }

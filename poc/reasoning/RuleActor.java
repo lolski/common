@@ -30,7 +30,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
     @Override
     public void receiveRequest(final Request request) {
-        assert request.path.atEnd() : "Rule receiving a request must be path terminal";
+        assert request.plan.atEnd() : "A rule that receives a request must be at the end of the plan";
 
         if (!this.requestProducers.containsKey(request)) {
             this.requestProducers.put(request, new ResponseProducer(true));
@@ -38,13 +38,13 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
         if (responseProducer.finished()) {
-            respondDoneToRequester(request);
+            respondDoneToUpstream(request);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                respondAnswersToRequester(request, responseProducer);
+                respondAnswersToUpstream(request, responseProducer);
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -62,7 +62,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
         responseProducer.requestsToDownstream--;
-        respondAnswersToRequester(parentRequest, responseProducer);
+        respondAnswersToUpstream(parentRequest, responseProducer);
 
         // TODO unify and materialise
     }
@@ -78,18 +78,18 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         responseProducer.setDownstreamDone();
 
         if (responseProducer.finished()) {
-            respondDoneToRequester(parentRequest);
+            respondDoneToUpstream(parentRequest);
         } else {
-            respondAnswersToRequester(parentRequest, responseProducer);
+            respondAnswersToUpstream(parentRequest, responseProducer);
         }
     }
 
     @Override
     void requestFromDownstream(final Request request) {
-        Path extendedPath = request.path.extend(whenActor);
-        Path downstreamPath = extendedPath.moveDownstream();
+        Plan extendedPlan = request.plan.addStep(whenActor);
+        Plan nextStep = extendedPlan.toNextStep();
         Request subrequest = new Request(
-                downstreamPath,
+                nextStep,
                 request.partialAnswers,
                 request.constraints,
                 request.unifiers
@@ -103,32 +103,32 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
-            Path newPath = request.path.moveUpstream();
+            Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
+            Plan shortenedPlan = request.plan.endStepCompleted();
             Response.Answer responseAnswer = new Response.Answer(
                     request,
-                    newPath,
+                    shortenedPlan,
                     Arrays.asList(answer),
                     request.constraints,
                     request.unifiers
             );
 
-            LOG.debug("Responding answer to requester in: " + name);
-            requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
+            LOG.debug("Responding answer to upstream in: " + name);
+            upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
             responseProducer.requestsFromUpstream--;
         }
     }
 
     @Override
-    void respondDoneToRequester(final Request request) {
-        Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
-        Path newPath = request.path.moveUpstream();
-        Response.Done responseDone = new Response.Done(request, newPath);
-        LOG.debug("Responding Done to requester in: " + name);
-        requester.tell((actor) -> actor.receiveDone(responseDone));
+    void respondDoneToUpstream(final Request request) {
+        Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
+        Plan shortenedPlan = request.plan.endStepCompleted();
+        Response.Done responseDone = new Response.Done(request, shortenedPlan);
+        LOG.debug("Responding Done to upstream in: " + name);
+        upstream.tell((actor) -> actor.receiveDone(responseDone));
     }
 }

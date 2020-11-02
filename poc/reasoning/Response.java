@@ -7,11 +7,11 @@ interface Response {
 
     class Done implements Response {
         private final Request request;
-        final Path path;
+        final Plan plan;
 
-        public Done(final Request request, final Path path) {
+        public Done(final Request request, final Plan plan) {
             this.request = request;
-            this.path = path;
+            this.plan = plan;
         }
 
         @Override
@@ -22,19 +22,19 @@ interface Response {
     }
 
     class Answer implements Response {
-        final Path path;
+        final Plan plan;
         final List<Long> partialAnswers;
         final List<Object> constraints;
         final List<Object> unifiers;
         private final Request request;
 
         public Answer(final Request request,
-                      final Path path,
+                      final Plan plan,
                       final List<Long> partialAnswers,
                       final List<Object> constraints,
                       final List<Object> unifiers) {
             this.request = request;
-            this.path = path;
+            this.plan = plan;
             this.partialAnswers = partialAnswers;
             this.constraints = constraints;
             this.unifiers = unifiers;

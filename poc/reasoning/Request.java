@@ -5,16 +5,16 @@ import java.util.List;
 import java.util.Objects;
 
 public class Request {
-    final Path path;
+    final Plan plan;
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
 
-    public Request(Path path,
+    public Request(Plan plan,
                    List<Long> partialAnswers,
                    List<Object> constraints,
                    List<Object> unifiers) {
-        this.path = path;
+        this.plan = plan;
         this.partialAnswers = partialAnswers;
         this.constraints = constraints;
         this.unifiers = unifiers;
@@ -25,7 +25,7 @@ public class Request {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Request request = (Request) o;
-        return Objects.equals(path, request.path) &&
+        return Objects.equals(plan, request.plan) &&
                 Objects.equals(partialAnswers, request.partialAnswers) &&
                 Objects.equals(constraints, request.constraints) &&
                 Objects.equals(unifiers, request.unifiers);
@@ -33,6 +33,6 @@ public class Request {
 
     @Override
     public int hashCode() {
-        return Objects.hash(path, partialAnswers, constraints, unifiers);
+        return Objects.hash(plan, partialAnswers, constraints, unifiers);
     }
 }

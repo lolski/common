@@ -55,7 +55,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         ResponseProducer responseProducer = this.requestProducers.get(request);
 
         if (responseProducer.finished()) {
-            respondDoneToRequester(request);
+            respondDoneToUpstream(request);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
@@ -63,7 +63,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
-                respondAnswersToRequester(request, responseProducer);
+                respondAnswersToUpstream(request, responseProducer);
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -93,7 +93,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         List<Long> answers = produceTraversalAnswers(responseProducer);
         responseProducer.answers.addAll(answers);
-        respondAnswersToRequester(parentRequest, responseProducer);
+        respondAnswersToUpstream(parentRequest, responseProducer);
     }
 
     @Override
@@ -107,21 +107,21 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         responseProducer.setDownstreamDone();
 
         if (responseProducer.finished()) {
-            respondDoneToRequester(parentRequest);
+            respondDoneToUpstream(parentRequest);
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
-            respondAnswersToRequester(parentRequest, responseProducer);
+            respondAnswersToUpstream(parentRequest, responseProducer);
         }
     }
 
     @Override
     void requestFromDownstream(final Request request) {
         // TODO open question - should downstream requests increment "requested" field?
-        Actor<? extends ReasoningActor<?>> downstream = request.path.directDownstream();
-        Path downstreamPath = request.path.moveDownstream();
+        Actor<? extends ReasoningActor<?>> downstream = request.plan.nextStep();
+        Plan nextStep = request.plan.toNextStep();
         Request subrequest = new Request(
-                downstreamPath,
+                nextStep,
                 request.partialAnswers,
                 request.constraints,
                 request.unifiers
@@ -130,39 +130,39 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(subrequest, request);
 
-        LOG.debug("Requesting from downstream from: " + name);
+        LOG.debug("Requesting from downstream in: " + name);
         downstream.tell(actor -> actor.receiveRequest(subrequest));
     }
 
     @Override
-    void respondAnswersToRequester(final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(final Request request, final ResponseProducer responseProducer) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
-            Path newPath = request.path.moveUpstream();
+            Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
+            Plan shortenedPlan = request.plan.endStepCompleted();
             List<Long> newAnswers = new ArrayList<>(1 + request.partialAnswers.size());
             newAnswers.addAll(request.partialAnswers);
             newAnswers.add(answer);
             Response.Answer responseAnswer = new Response.Answer(
                     request,
-                    newPath,
+                    shortenedPlan,
                     newAnswers,
                     request.constraints,
                     request.unifiers
             );
 
-            LOG.debug("Responding answer to requester from actor: " + name);
-            requester.tell((actor) -> actor.receiveAnswer(responseAnswer));
+            LOG.debug("Responding answer to upstream from actor: " + name);
+            upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
             responseProducer.requestsFromUpstream--;
         }
     }
 
     @Override
-    void respondDoneToRequester(final Request request) {
-        Actor<? extends ReasoningActor<?>> requester = request.path.directUpstream();
-        Path newPath = request.path.moveUpstream();
-        Response.Done responseDone = new Response.Done(request, newPath);
+    void respondDoneToUpstream(final Request request) {
+        Actor<? extends ReasoningActor<?>> requester = request.plan.previousStep();
+        Plan shortenedPlan = request.plan.endStepCompleted();
+        Response.Done responseDone = new Response.Done(request, shortenedPlan);
         LOG.debug("Responding Done to requester from actor: " + name);
         requester.tell((actor) -> actor.receiveDone(responseDone));
     }
@@ -180,8 +180,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        boolean downstreamExists = request.path.directDownstream() != null;
-        ResponseProducer responseProducer = new ResponseProducer(downstreamExists);
+        boolean hasNextStep = request.plan.nextStep() != null;
+        ResponseProducer responseProducer = new ResponseProducer(hasNextStep);
 
         if (responseProducer.isDownstreamDone()) {
             registerTraversal(responseProducer, 0L);

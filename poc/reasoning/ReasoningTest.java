@@ -36,7 +36,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(conjunctive.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
             Long answer = responses.take();
@@ -81,7 +81,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(conjunctive.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -124,7 +124,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(conjunctive.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -171,7 +171,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             rootConjunction.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(rootConjunction.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -219,7 +219,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             rootConjunction.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(rootConjunction.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -275,7 +275,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             rootConjunction.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(rootConjunction.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
