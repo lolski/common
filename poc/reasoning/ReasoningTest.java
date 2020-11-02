@@ -1,30 +1,51 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.concurrent.actor.ActorRoot;
+import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
 
 public class ReasoningTest {
     @Test
     public void singleAtomicActor() throws InterruptedException {
-        ActorManager manager = new ActorManager();
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        manager.createAtomicActor(0L, 5L, Arrays.asList());
-        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(0L), 5L);
+        actorRegistry.registerAtomic(0L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 5L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(0L), 5L, responses))
+        ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        int n = 5;
+        long n = 5L + 5L + 1; //total number of traversal answers
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
                             new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
-            manager.takeAnswer();
+            Long answer = responses.take();
+            System.out.println(answer);
+            if (i < n - 1) {
+                assertTrue(answer != -1);
+            } else {
+                assertTrue(answer == -1);
+            }
         }
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         Thread.sleep(20);
@@ -33,15 +54,30 @@ public class ReasoningTest {
 
     @Test
     public void doubleAtomicActor() throws InterruptedException {
-        ActorManager manager = new ActorManager();
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        manager.createAtomicActor(2L, 2L, Arrays.asList());
-        manager.createAtomicActor(20L, 2L, Arrays.asList());
-        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(20L, 2L), 0L);
+        actorRegistry.registerAtomic(2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 2L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(20L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 2L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(20L, 2L), 0L, responses))
+        ).awaitUnchecked();
+
 
         long startTime = System.currentTimeMillis();
-        int n = 4;
+        long n = 0L + (2L * 2L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
@@ -49,55 +85,89 @@ public class ReasoningTest {
                     )
             );
         }
+
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
+        }
+        assertEquals(responses.take().longValue(), -1L);
 //        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
-        manager.takeAnswer();
-        manager.takeAnswer();
-        manager.takeAnswer();
-        manager.takeAnswer();
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(!manager.hasAnswer());
+        assertTrue(responses.isEmpty());
     }
 
     @Test
     public void simpleRule() throws InterruptedException {
-        // check TODO in ReasoningActor for why this is stalling
-        ActorManager manager = new ActorManager();
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        Actor<AtomicActor> bottomAtomic = manager.createAtomicActor(-2L, 4L, Arrays.asList());
-        Actor<AtomicActor> atomicWithRule = manager.createAtomicActor(2L, 4L, Arrays.asList(Arrays.asList(-2L)));
-        Actor<ConjunctiveActor> rootConjunction = manager.createRootConjunctiveActor(Arrays.asList(2L), 0L);
+        actorRegistry.registerAtomic(-2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList(Arrays.asList(-2L))))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(2L), 0L, responses))
+        ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        int n = 4;
+        long n = 0L + (2L) + (2L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
-            rootConjunction.tell(actor ->
+            conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
-//        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
-        manager.takeAnswer();
-        manager.takeAnswer();
-        manager.takeAnswer();
-        manager.takeAnswer();
+
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
+        }
+        assertEquals(responses.take().longValue(), -1L);
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(!manager.hasAnswer());
+        assertTrue(responses.isEmpty());
     }
 
     @Test
     public void atomicChainWithRule() throws InterruptedException {
-        ActorManager manager = new ActorManager();
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        Actor<AtomicActor> bottomAtomic = manager.createAtomicActor(-2L, 4L, Arrays.asList());
-        Actor<AtomicActor> atomicWithRule = manager.createAtomicActor(2L, 4L, Arrays.asList(Arrays.asList(-2L)));
-        Actor<AtomicActor> atomic = manager.createAtomicActor(20L, 4L, Arrays.asList());
-        Actor<ConjunctiveActor> rootConjunction = manager.createRootConjunctiveActor(Arrays.asList(20L, 2L), 0L);
+        Actor<AtomicActor> bottomAtomic = actorRegistry.registerAtomic(-2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<AtomicActor> atomicWithRule = actorRegistry.registerAtomic(2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList(Arrays.asList(-2L))))
+                ).awaitUnchecked()
+        );
+        Actor<AtomicActor> atomicWithoutRule = actorRegistry.registerAtomic(20L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> rootConjunction = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(20L, 2L), 0L, responses))
+        ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        int n = 4;
+        long n = 0L + (4*4) + (4*4) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             rootConjunction.tell(actor ->
                     actor.receiveRequest(
@@ -105,68 +175,116 @@ public class ReasoningTest {
                     )
             );
         }
-//        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
-        manager.takeAnswer();
-        manager.takeAnswer();
-        manager.takeAnswer();
-        manager.takeAnswer();
+
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
+        }
+        assertEquals(responses.take().longValue(), -1L);
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(!manager.hasAnswer());
+        assertTrue(responses.isEmpty());
     }
 
 
     @Test
     public void shallowRerequest() throws InterruptedException {
-        ActorManager manager = new ActorManager();
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        manager.createAtomicActor(2L, 2L, Arrays.asList());
-        manager.createAtomicActor(20L, 2L, Arrays.asList());
-        manager.createAtomicActor(200L, 2L, Arrays.asList());
+        actorRegistry.registerAtomic(2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(20L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(200L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> rootConjunction = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(200L, 20L, 2L), 0L, responses))
+        ).awaitUnchecked();
 
-        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(200L, 20L, 2L), 0L);
         long startTime = System.currentTimeMillis();
-        int n = 5;
+        long n = 0L + (4L*4L*4L) + 1;
         for (int i = 0; i < n; i++) {
-            conjunctive.tell(actor ->
+            rootConjunction.tell(actor ->
                     actor.receiveRequest(
-                            // TODO UNDO HACK
-                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
-        for (int i = 0; i < n; i++) {
-            manager.takeAnswer();
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
         }
+        assertEquals(responses.take().longValue(), -1L);
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(!manager.hasAnswer());
+        assertTrue(responses.isEmpty());
     }
 
     @Test
     public void deepRerequest() throws InterruptedException {
-        ActorManager manager = new ActorManager();
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        manager.createAtomicActor(2L, 10L, Arrays.asList());
-        manager.createAtomicActor(20L, 10L, Arrays.asList());
-        manager.createAtomicActor(200L, 10L, Arrays.asList());
-        manager.createAtomicActor(2000L, 10L, Arrays.asList());
-        manager.createAtomicActor(20000L, 10L, Arrays.asList());
-        Actor<ConjunctiveActor> conjunctive = manager.createRootConjunctiveActor(Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L);
+        actorRegistry.registerAtomic(2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 10L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(20L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 10L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(200L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 10L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(2000L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 10L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(20000L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 10L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> rootConjunction = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L, responses))
+        ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        int n = 10000;
+        long n = 0L + (10L*10L*10L*10L*10L) + 1;
         for (int i = 0; i < n; i++) {
-            conjunctive.tell(actor ->
+            rootConjunction.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(rootConjunction.state.path, Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
-        for (int i = 0; i < n; i++) {
-            manager.takeAnswer();
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
         }
+        assertEquals(responses.take().longValue(), -1L);
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(!manager.hasAnswer());
+        assertTrue(responses.isEmpty());
     }
 }

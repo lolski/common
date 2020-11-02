@@ -23,8 +23,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     private final Map<Request, Request> requestRouter;
     private final List<Actor<RuleActor>> ruleActors;
 
-    public AtomicActor(final Actor<AtomicActor> self, ActorManager manager, Long traversalPattern, final long traversalSize, List<List<Long>> rules) throws InterruptedException {
-        super(self);
+    public AtomicActor(final Actor<AtomicActor> self, ActorRegistry actorRegistry, Long traversalPattern, final long traversalSize, List<List<Long>> rules) {
+        super(self, actorRegistry);
         LOG = LoggerFactory.getLogger(AtomicActor.class.getSimpleName() + "-" + traversalPattern);
 
         this.name = "AtomicActor(pattern: " + traversalPattern + ")";
@@ -32,13 +32,15 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         this.traversalSize = traversalSize;
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
-        ruleActors = createRuleActors(manager, rules);
+        ruleActors = registerRuleActors(actorRegistry, rules);
     }
 
-    private List<Actor<RuleActor>> createRuleActors(final ActorManager manager, final List<List<Long>> rules) throws InterruptedException {
+    private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
         final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
         for (List<Long> rule : rules) {
-            ruleActors.add(manager.createRuleActor(rule, 1L));
+            actorRegistry.registerRule(rule, pattern ->
+                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L))
+            );
         }
         return ruleActors;
     }

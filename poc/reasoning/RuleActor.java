@@ -17,13 +17,13 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     private final Map<Request, Request> requestRouter;
     private final String name;
 
-    public RuleActor(final Actor<RuleActor> self, ActorManager manager, List<Long> when,
-                     Long whenTraversalSize) throws InterruptedException {
-        super(self);
+    public RuleActor(final Actor<RuleActor> self, ActorRegistry actorRegistry, List<Long> when,
+                     Long whenTraversalSize) {
+        super(self, actorRegistry);
         LOG = LoggerFactory.getLogger(RuleActor.class.getSimpleName() + "-" + when);
 
         this.name = String.format("RuleActor(pattern:%s)", when);
-        whenActor = manager.createConjunctiveActor(when, whenTraversalSize);
+        whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize, null));
         requestRouter = new HashMap<>();
         requestProducers = new HashMap<>();
     }

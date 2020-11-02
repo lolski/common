@@ -27,16 +27,16 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private final Map<Request, Request> requestRouter;
 
 
-    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, ActorManager manager, List<Long> conjunction,
-                               Long traversalSize, LinkedBlockingQueue<Long> responses) throws InterruptedException {
-        super(self);
+    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, ActorRegistry actorRegistry, List<Long> conjunction,
+                               Long traversalSize, LinkedBlockingQueue<Long> responses) {
+        super(self, actorRegistry);
         LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + conjunction);
 
         this.name = "ConjunctiveActor(pattern:" + conjunction + ")";
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
         this.responses = responses;
-        this.path = plan(manager, this.conjunction);
+        this.path = plan(actorRegistry, this.conjunction);
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
@@ -183,16 +183,16 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     The first constraint should be the starting point that finds initial answers
     before propagating them in the order indicated by the plan
      */
-    private Path plan(ActorManager manager, List<Long> conjunction) throws InterruptedException {
+    private Path plan(ActorRegistry actorRegistry, List<Long> conjunction) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
         List<Actor<? extends ReasoningActor<?>>> planAsActors = new ArrayList<>();
         planAsActors.add(self());
         // in the future, we'll check if the atom is rule resolvable first
-        for (Long atomicConstraint : planned) {
-            Actor<AtomicActor> actor = manager.getAtomicActor(atomicConstraint);
-            if (actor == null) actor = manager.createAtomicActor(atomicConstraint, 5L, Arrays.asList());
-            planAsActors.add(actor);
+        for (Long atomicPattern : planned) {
+            Actor<AtomicActor> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
+                    child((newActor) -> new AtomicActor(newActor, actorRegistry, pattern, 5L, Arrays.asList())));
+            planAsActors.add(atomicActor);
         }
 
         // plan the atomics in the conjunction
