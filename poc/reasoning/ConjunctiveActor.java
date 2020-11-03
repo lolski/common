@@ -95,11 +95,11 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         responseProducer.answers.add(mergedAnswers);
         Plan newPlan = answer.plan.endStepCompleted();
         respondAnswersToUpstream(
-                request,
+                fromUpstream,
                 newPlan,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers,
+                fromUpstream.partialAnswers,
+                fromUpstream.constraints,
+                fromUpstream.unifiers,
                 responseProducer,
                 newPlan.currentStep()
         );
@@ -123,11 +123,11 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
             respondAnswersToUpstream(
-                    request,
+                    fromUpstream,
                     responsePlan,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers,
+                    fromUpstream.partialAnswers,
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
                     responseProducer,
                     responsePlan.currentStep()
             );

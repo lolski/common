@@ -74,13 +74,17 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         Request fromUpstream = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
+
+        Long mergedAnswer = answer.partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
+        responseProducer.answers.add(mergedAnswer);
+
         Plan responsePlan = answer.plan.endStepCompleted();
         respondAnswersToUpstream(
-                request,
+                fromUpstream,
                 responsePlan,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers,
+                fromUpstream.partialAnswers,
+                fromUpstream.constraints,
+                fromUpstream.unifiers,
                 responseProducer,
                 responsePlan.currentStep()
         );
@@ -103,11 +107,11 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             respondAnswersToUpstream(
-                    request,
+                    fromUpstream,
                     responsePlan,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers,
+                    fromUpstream.partialAnswers,
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
                     responseProducer,
                     responsePlan.currentStep()
             );
