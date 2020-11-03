@@ -155,7 +155,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                                   final List<Object> unifiers,
                                   final ResponseProducer responseProducer,
                                   @Nullable final Actor<? extends ReasoningActor<?>> upstream) {
-        // send as many answers as possible to requester
+        // send as many answers as possible to upstream
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
             if (upstream == null) {

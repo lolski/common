@@ -194,17 +194,17 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         Actor<AtomicActor> bottomAtomic = actorRegistry.registerAtomic(-2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         Actor<AtomicActor> atomicWithRule = actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList(Arrays.asList(-2L))))
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
                 ).awaitUnchecked()
         );
         Actor<AtomicActor> atomicWithoutRule = actorRegistry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
@@ -212,7 +212,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (4*4) + (4*4) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
+        long n = 0L + (1*1) + (1*1) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
@@ -223,6 +223,7 @@ public class ReasoningTest {
 
         for (int i = 0; i < n - 1; i++) {
             Long answer = responses.take();
+            System.out.println("---- take(): " + answer);
             assertTrue(answer != -1);
         }
         assertEquals(responses.take().longValue(), -1L);

@@ -216,7 +216,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             final ResponseProducer responseProducer,
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
-        // send as many answers as possible to requester
+        // send as many answers as possible to upstream
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
             List<Long> newAnswers = new ArrayList<>(partialAnswers);
@@ -237,10 +237,10 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     @Override
     void respondDoneToUpstream(final Request request, final Plan responsePlan) {
-        Actor<? extends ReasoningActor<?>> requester = responsePlan.currentStep();
+        Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
         Response.Done responseDone = new Response.Done(request, responsePlan);
-        LOG.debug("Responding Done to requester from actor: " + name);
-        requester.tell((actor) -> actor.receiveDone(responseDone));
+        LOG.debug("Responding Done to upstream from actor: " + name);
+        upstream.tell((actor) -> actor.receiveDone(responseDone));
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {

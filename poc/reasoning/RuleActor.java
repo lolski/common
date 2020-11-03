@@ -139,7 +139,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             final ResponseProducer responseProducer,
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
-        // send as many answers as possible to requester
+        // send as many answers as possible to upstream
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
             List<Long> newAnswers = new ArrayList<>(partialAnswers);
