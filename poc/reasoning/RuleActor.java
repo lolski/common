@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +34,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         assert request.plan.atEnd() : "A rule that receives a request must be at the end of the plan";
 
         if (!this.requestProducers.containsKey(request)) {
-            this.requestProducers.put(request, new ResponseProducer(true));
+            this.requestProducers.put(request, initialiseResponseProducer(request));
         }
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
@@ -59,7 +60,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request);
+                    requestFromDownstream(request, responseProducer);
                 }
             }
         }
@@ -69,8 +70,8 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
-        Request parentRequest = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        Request fromUpstream = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
         Plan responsePlan = answer.plan.endStepCompleted();
         respondAnswersToUpstream(
@@ -90,15 +91,15 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
-        Request parentRequest = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        Request fromUpstream = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
-        responseProducer.setDownstreamDone();
+        responseProducer.downstreamDone(request);
         Plan responsePlan = done.plan.endStepCompleted();
 
         if (responseProducer.finished()) {
-            respondDoneToUpstream(parentRequest, responsePlan);
+            respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             respondAnswersToUpstream(
                     request,
@@ -113,21 +114,14 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request request) {
-        Plan extendedPlan = request.plan.addStep(whenActor);
-        Plan nextStep = extendedPlan.toNextStep();
-        Request subrequest = new Request(
-                nextStep,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers
-        );
+    void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
+        Request toDownstream = responseProducer.toDownstream();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(subrequest, request);
+        requestRouter.put(toDownstream, request);
 
         LOG.debug("Requesting from downstream in: " + name);
-        whenActor.tell(actor -> actor.receiveRequest(subrequest));
+        whenActor.tell(actor -> actor.receiveRequest(toDownstream));
     }
 
     @Override
@@ -165,5 +159,18 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         Response.Done responseDone = new Response.Done(request, responsePlan);
         LOG.debug("Responding Done to upstream in: " + name);
         upstream.tell((actor) -> actor.receiveDone(responseDone));
+    }
+
+    private ResponseProducer initialiseResponseProducer(final Request request) {
+        ResponseProducer responseProducer = new ResponseProducer();
+        Plan nextStep = request.plan.addStep(whenActor).toNextStep();
+        Request toDownstream = new Request(
+                nextStep,
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers
+        );
+        responseProducer.addAvailableDownstream(toDownstream);
+        return responseProducer;
     }
 }

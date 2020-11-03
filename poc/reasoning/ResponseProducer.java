@@ -2,20 +2,26 @@ package grakn.common.poc.reasoning;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 class ResponseProducer {
+    private List<Request> downstreamsAvailable;
     List<Iterator<Long>> traversalProducers;
-    boolean downstreamDone;
-    List<Long> answers = new LinkedList<>();
+    List<Long> answers;
     int requestsFromUpstream = 0;
     int requestsToDownstream = 0;
 
-    public ResponseProducer(boolean hasDownstream) {
+    public ResponseProducer() {
+        this.downstreamsAvailable = new ArrayList<>();
         this.traversalProducers = new ArrayList<>();
-        this.downstreamDone = !hasDownstream;
+        this.traversalProducers = new ArrayList<>();
+        this.answers = new LinkedList<>();
     }
 
     public void addTraversalProducer(Iterator<Long> traversalProducer) {
@@ -33,17 +39,24 @@ class ResponseProducer {
     }
 
     public boolean finished() {
-        boolean finished = downstreamDone && traversalProducers.isEmpty();
+        boolean finished = downstreamsAvailable.isEmpty() && traversalProducers.isEmpty();
         if (finished) assert answers.isEmpty() : "Downstream and traversalProducers are finished, answers should already be sent";
         return finished;
     }
 
-    public void setDownstreamDone() {
-        downstreamDone = true;
-    }
-
     public boolean isDownstreamDone() {
-        return downstreamDone;
+        return downstreamsAvailable.isEmpty();
     }
 
+    public void addAvailableDownstream(final Request toDownstream) {
+        downstreamsAvailable.add(toDownstream);
+    }
+
+    public void downstreamDone(final Request request) {
+        downstreamsAvailable.remove(request);
+    }
+
+    public Request toDownstream() {
+        return downstreamsAvailable.get(0);
+    }
 }

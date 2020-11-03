@@ -73,7 +73,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request);
+                    requestFromDownstream(request, responseProducer);
                 }
             }
         }
@@ -83,8 +83,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
-        Request parentRequest = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        Request fromUpstream = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         // directly pass answer response back after combining into a single answer
@@ -107,16 +107,16 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
-        Request parentRequest = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        Request fromUpstream = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         // every conjunction has exactly 1 downstream, so a done message must indicate the downstream is done
-        responseProducer.setDownstreamDone();
+        responseProducer.downstreamDone(request);
         Plan responsePlan = done.plan.endStepCompleted();
 
         if (responseProducer.finished()) {
-            respondDoneToUpstream(parentRequest, responsePlan);
+            respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
@@ -133,21 +133,15 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request request) {
-        Actor<? extends ReasoningActor<?>> downstream = request.plan.nextStep();
-        Plan nextStep = request.plan.toNextStep();
-        Request subrequest = new Request(
-                nextStep,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers
-        );
+    void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
+        Request toDownstream = responseProducer.toDownstream();
+        Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(subrequest, request);
+        requestRouter.put(toDownstream, request);
 
         LOG.debug("Requesting from downstream in: " + name);
-        downstream.tell(actor -> actor.receiveRequest(subrequest));
+        downstream.tell(actor -> actor.receiveRequest(toDownstream));
         requestProducers.get(request).requestsToDownstream++;
     }
 
@@ -233,8 +227,19 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        boolean hasNextStep = request.plan.nextStep() != null;
-        ResponseProducer responseProducer = new ResponseProducer(hasNextStep);
+        ResponseProducer responseProducer = new ResponseProducer();
+        boolean hasDownstream = request.plan.nextStep() != null;
+        if (hasDownstream) {
+            Plan nextStep = request.plan.toNextStep();
+            Request toDownstream = new Request(
+                    nextStep,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
+            responseProducer.addAvailableDownstream(toDownstream);
+        }
+
         Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);

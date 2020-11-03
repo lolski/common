@@ -77,7 +77,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request);
+                    requestFromDownstream(request, responseProducer);
                 }
             }
         }
@@ -92,8 +92,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
-        Request parentRequest = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        Request fromUpstream = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         List<Long> partialAnswers = answer.partialAnswers;
@@ -106,11 +106,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         Plan shortenedPlan = answer.plan.endStepCompleted();
 
         respondAnswersToUpstream(
-                parentRequest,
+                fromUpstream,
                 shortenedPlan,
-                parentRequest.partialAnswers,
-                parentRequest.constraints,
-                parentRequest.unifiers,
+                fromUpstream.partialAnswers,
+                fromUpstream.constraints,
+                fromUpstream.unifiers,
                 responseProducer,
                 shortenedPlan.currentStep()
         );
@@ -120,24 +120,24 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
-        Request parentRequest = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(parentRequest);
+        Request fromUpstream = requestRouter.get(request);
+        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
-        responseProducer.setDownstreamDone();
+        responseProducer.downstreamDone(request);
 
         Plan responsePlan = done.plan.endStepCompleted();
         if (responseProducer.finished()) {
-            respondDoneToUpstream(parentRequest, responsePlan);
+            respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
             respondAnswersToUpstream(
-                    parentRequest,
+                    fromUpstream,
                     responsePlan,
-                    parentRequest.partialAnswers,
-                    parentRequest.constraints,
-                    parentRequest.unifiers,
+                    fromUpstream.partialAnswers,
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
                     responseProducer,
                     responsePlan.currentStep()
             );
@@ -145,22 +145,15 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request request) {
-        // TODO open question - should downstream requests increment "requested" field?
-        Actor<? extends ReasoningActor<?>> downstream = request.plan.nextStep();
-        Plan nextStep = request.plan.toNextStep();
-        Request subrequest = new Request(
-                nextStep,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers
-        );
-
+    void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
+        Request toDownstream = responseProducer.toDownstream();
+        Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
+        responseProducer.requestsToDownstream++;
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(subrequest, request);
+        requestRouter.put(toDownstream, request);
 
         LOG.debug("Requesting from downstream in: " + name);
-        downstream.tell(actor -> actor.receiveRequest(subrequest));
+        downstream.tell(actor -> actor.receiveRequest(toDownstream));
     }
 
     @Override
@@ -213,10 +206,19 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        boolean hasNextStep = request.plan.nextStep() != null;
-        ResponseProducer responseProducer = new ResponseProducer(hasNextStep);
+        ResponseProducer responseProducer = new ResponseProducer();
 
-        if (responseProducer.isDownstreamDone()) {
+        boolean hasDownstream = request.plan.nextStep() != null;
+        if (hasDownstream) {
+            Plan nextStep = request.plan.toNextStep();
+            Request toDownstream = new Request(
+                    nextStep,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
+            responseProducer.addAvailableDownstream(toDownstream);
+        } else {
             registerTraversal(responseProducer, 0L);
         }
 
