@@ -191,6 +191,12 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                     responseProducer,
                     responsePlan.currentStep()
             );
+
+            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+                if (!responseProducer.isDownstreamDone()) {
+                    requestFromDownstream(request, responseProducer);
+                }
+            }
         }
     }
 
