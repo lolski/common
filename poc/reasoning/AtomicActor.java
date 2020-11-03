@@ -38,9 +38,10 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
         final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
         for (List<Long> rule : rules) {
-            actorRegistry.registerRule(rule, pattern ->
+            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
                     child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L))
             );
+            ruleActors.add(ruleActor);
         }
         return ruleActors;
     }
@@ -97,23 +98,72 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         responseProducer.requestsToDownstream--;
 
         List<Long> partialAnswers = answer.partialAnswers;
-        Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
-        registerTraversal(responseProducer, mergedAnswers);
+        Plan responsePlan = answer.plan.endStepCompleted();
 
-        List<Long> answers = produceTraversalAnswers(responseProducer);
-        responseProducer.answers.addAll(answers);
+        // TODO fix accessing state
+        if (request.plan.currentStep().state instanceof AtomicActor) {
+            registerTraversal(responseProducer, partialAnswers);
+            List<Long> answers = produceTraversalAnswers(responseProducer);
+            responseProducer.answers.addAll(answers);
+            respondAnswersToUpstream(
+                    fromUpstream,
+                    responsePlan,
+                    fromUpstream.partialAnswers,
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
 
-        Plan shortenedPlan = answer.plan.endStepCompleted();
+            registerRuleDownstreams(
+                    answer.plan,
+                    answer.partialAnswers,
+                    answer.constraints,
+                    answer.unifiers,
+                    responseProducer
+            );
+            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+                if (!responseProducer.isDownstreamDone()) {
+                    requestFromDownstream(request, responseProducer);
+                }
+            }
+        } else if (request.plan.currentStep().state instanceof RuleActor) {
+            Long mergedAnswer = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
+            responseProducer.answers.add(mergedAnswer);
+            respondAnswersToUpstream(
+                    fromUpstream,
+                    responsePlan,
+                    Arrays.asList(),
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
+        } else {
+            throw new RuntimeException("Unhandled downstream actor of type " + request.plan.nextStep().state.getClass().getSimpleName());
+        }
 
-        respondAnswersToUpstream(
-                fromUpstream,
-                shortenedPlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducer,
-                shortenedPlan.currentStep()
-        );
+        if (responseProducer.finished()) {
+            respondDoneToUpstream(request, responsePlan);
+        }
+    }
+
+    private void registerRuleDownstreams(
+            Plan basePlan,
+            List<Long> partialAnswers,
+            List<Object> constraints,
+            List<Object> unifiers,
+            final ResponseProducer responseProducer) {
+        for (Actor<RuleActor> ruleActor : ruleActors) {
+            Plan toRule = basePlan.addStep(ruleActor).toNextStep();
+            Request toDownstream = new Request(
+                    toRule,
+                    partialAnswers,
+                    constraints,
+                    unifiers
+            );
+            responseProducer.addAvailableDownstream(toDownstream);
+        }
     }
 
     @Override
@@ -219,15 +269,23 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             );
             responseProducer.addAvailableDownstream(toDownstream);
         } else {
-            registerTraversal(responseProducer, 0L);
+            registerTraversal(responseProducer, request.partialAnswers);
+            registerRuleDownstreams(
+                    request.plan,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers,
+                    responseProducer
+            );
         }
 
         return responseProducer;
     }
 
-    private void registerTraversal(final ResponseProducer responseProducer, long partialAnswer) {
-        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(partialAnswer);
-        responseProducer.addTraversalProducer(traversal);
+    private void registerTraversal(final ResponseProducer responseProducer, List<Long> partialAnswers) {
+        Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
+        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(mergedAnswers);
+        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
     }
 }
 

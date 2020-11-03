@@ -5,6 +5,7 @@ import grakn.common.concurrent.actor.Actor;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -55,11 +56,17 @@ public class Plan {
         return plan;
     }
 
-    public Plan addStep(final Actor<ConjunctiveActor> whenActor) {
+    public Plan addStep(final Actor<? extends ReasoningActor<?>> actor) {
+        assert current == plan.size() - 1 : "Can only add a step if at the last step of the plan";
+        return addSteps(Arrays.asList(actor));
+    }
+
+    public Plan addSteps(final List<? extends Actor<? extends ReasoningActor<?>>> actors) {
         assert current == plan.size() - 1 : "Can only add a step if at the last step of the plan";
 
         Plan plan = new Plan(this.plan);
-        plan.plan.add(whenActor);
+        plan.plan.addAll(actors);
+        plan.current = this.current;
         return plan;
     }
 

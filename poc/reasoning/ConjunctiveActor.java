@@ -19,7 +19,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
     private final String name;
     private final List<Long> conjunction;
-    final Plan plan; // TODO open for tests
+    private final List<Actor<AtomicActor>> plannedAtomics;
     private final Long traversalSize;
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
@@ -36,7 +36,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
         this.responses = responses;
-        this.plan = plan(actorRegistry, this.conjunction);
+        this.plannedAtomics = plan(actorRegistry, this.conjunction);
         requestProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
@@ -44,6 +44,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     @Override
     public void receiveRequest(final Request request) {
         LOG.debug("Received request in: " + name);
+        assert request.plan.atEnd() : "A conjunction that receives a request must be at the end of the plan";
+
         if (!this.requestProducers.containsKey(request)) {
             this.requestProducers.put(request, initialiseResponseProducer(request));
         }
@@ -210,11 +212,10 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     The first constraint should be the starting point that finds initial answers
     before propagating them in the order indicated by the plan
      */
-    private Plan plan(ActorRegistry actorRegistry, List<Long> conjunction) {
+    private List<Actor<AtomicActor>> plan(ActorRegistry actorRegistry, List<Long> conjunction) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
-        List<Actor<? extends ReasoningActor<?>>> planAsActors = new ArrayList<>();
-        planAsActors.add(self());
+        List<Actor<AtomicActor>> planAsActors = new ArrayList<>();
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
             Actor<AtomicActor> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
@@ -223,22 +224,19 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
 
         // plan the atomics in the conjunction
-        return new Plan(planAsActors).toNextStep();
+        return planAsActors;
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
         ResponseProducer responseProducer = new ResponseProducer();
-        boolean hasDownstream = request.plan.nextStep() != null;
-        if (hasDownstream) {
-            Plan nextStep = request.plan.toNextStep();
-            Request toDownstream = new Request(
-                    nextStep,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
-            responseProducer.addAvailableDownstream(toDownstream);
-        }
+        Plan nextPlan = request.plan.addSteps(this.plannedAtomics).toNextStep();
+        Request toDownstream = new Request(
+                nextPlan,
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers
+        );
+        responseProducer.addAvailableDownstream(toDownstream);
 
         Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);

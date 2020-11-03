@@ -31,6 +31,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
     @Override
     public void receiveRequest(final Request request) {
+        LOG.debug("Received request in: " + name);
         assert request.plan.atEnd() : "A rule that receives a request must be at the end of the plan";
 
         if (!this.requestProducers.containsKey(request)) {

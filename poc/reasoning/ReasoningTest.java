@@ -36,7 +36,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
             Long answer = responses.take();
@@ -81,7 +81,52 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                    )
+            );
+        }
+
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
+        }
+        assertEquals(responses.take().longValue(), -1L);
+//        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
+        System.out.println("Time : " + (System.currentTimeMillis() - startTime));
+        assertTrue(responses.isEmpty());
+    }
+
+
+    @Test
+    public void filteringAtomicActor() throws InterruptedException {
+        ActorRegistry actorRegistry = new ActorRegistry();
+
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
+
+        // create atomic actors first to control answer size
+        actorRegistry.registerAtomic(2L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 2L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        actorRegistry.registerAtomic(20L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 0L, Arrays.asList()))
+                ).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
+                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(20L, 2L), 0L, responses))
+        ).awaitUnchecked();
+
+
+        long startTime = System.currentTimeMillis();
+        long n = 0L + (0L * 0L) + 1; // total number of traversal answers, plus one expected DONE (-1 answer)
+        for (int i = 0; i < n; i++) {
+            conjunctive.tell(actor ->
+                    actor.receiveRequest(
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -107,12 +152,12 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(-2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList(Arrays.asList(-2L))))
+                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
                 ).awaitUnchecked()
         );
         Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
@@ -120,11 +165,11 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (4L) + (4L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
+        long n = 0L + (1L) + (1L) + (1L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(conjunctive.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -162,16 +207,16 @@ public class ReasoningTest {
                         actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> rootConjunction = rootActor.ask(actor ->
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
                 actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
         long n = 0L + (4*4) + (4*4) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
-            rootConjunction.tell(actor ->
+            conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -210,16 +255,16 @@ public class ReasoningTest {
                         actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> rootConjunction = rootActor.ask(actor ->
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
                 actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(200L, 20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
         long n = 0L + (4L*4L*4L) + 1;
         for (int i = 0; i < n; i++) {
-            rootConjunction.tell(actor ->
+            conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
@@ -266,16 +311,16 @@ public class ReasoningTest {
                         actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> rootConjunction = rootActor.ask(actor ->
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
                 actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
         long n = 0L + (10L*10L*10L*10L*10L) + 1;
         for (int i = 0; i < n; i++) {
-            rootConjunction.tell(actor ->
+            conjunctive.tell(actor ->
                     actor.receiveRequest(
-                            new Request(rootConjunction.state.plan, Arrays.asList(), Arrays.asList(), Arrays.asList())
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
         }
