@@ -9,47 +9,70 @@ import java.util.List;
 import java.util.Objects;
 
 public class Plan {
+    private static final int NOT_STARTED = -1;
+
     List<Actor<? extends ReasoningActor<?>>> plan;
-    int current = 0;
+    int current = NOT_STARTED;
 
     public Plan(List<Actor<? extends ReasoningActor<?>>> plan) {
         this.plan = new ArrayList<>(plan);
-    }
-
-    boolean atStart() {
-        return current == 0;
     }
 
     boolean atEnd() {
         return current == plan.size() - 1;
     }
 
+    boolean isEmpty() {
+        boolean isEmpty = plan.size() == 0;
+        if (isEmpty) {
+            assert current == NOT_STARTED : "An empty plan's current position must be -1";
+        }
+        return isEmpty;
+    }
+
     Plan toNextStep() {
         Plan plan = new Plan(this.plan);
         plan.current = this.current + 1;
-        assert plan.current < plan.plan.size() : "Trying to move past the end of the plan";
+        assert plan.current < plan.plan.size() : "Trying to move past the last step of the plan";
         return plan;
     }
 
     Plan endStepCompleted() {
+        assert current != NOT_STARTED;
         assert current == plan.size() - 1 : "Can only complete the end step if it is the last step of the plan";
 
         Plan plan = new Plan(this.plan.subList(0, this.plan.size() - 1));
         plan.current = this.current - 1;
-        assert plan.current >= 0 : "Trying to move to before the beginning of the plan";
+        assert plan.current >= NOT_STARTED : "Trying to move to the position before the first step of the plan";
+        return plan;
+    }
+
+    public Plan truncate() {
+        assert current != NOT_STARTED;
+
+        Plan plan = new Plan(this.plan.subList(0, current + 1));
+        plan.current = this.current;
         return plan;
     }
 
     public Plan addStep(final Actor<ConjunctiveActor> whenActor) {
-        assert current == plan.size() - 1 : "Can only add a step if at the end of the plan";
+        assert current == plan.size() - 1 : "Can only add a step if at the last step of the plan";
 
         Plan plan = new Plan(this.plan);
         plan.plan.add(whenActor);
         return plan;
     }
 
+    @Nullable
     public Actor<? extends ReasoningActor<?>> previousStep() {
+        if (current == 0) return null;
         return plan.get(current - 1);
+    }
+
+    @Nullable
+    public Actor<? extends ReasoningActor<?>> currentStep() {
+        if (current == NOT_STARTED) return null;
+        return plan.get(current);
     }
 
     @Nullable

@@ -4,7 +4,7 @@ import grakn.common.concurrent.actor.Actor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,14 +37,24 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         }
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
+        Plan responsePlan = request.plan.endStepCompleted();
+
         if (responseProducer.finished()) {
-            respondDoneToUpstream(request);
+            respondDoneToUpstream(request, responsePlan);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                respondAnswersToUpstream(answer.plan.endStepCompleted(), request, responseProducer);
+                respondAnswersToUpstream(
+                        request,
+                        responsePlan,
+                        request.partialAnswers,
+                        request.constraints,
+                        request.unifiers,
+                        responseProducer,
+                        responsePlan.currentStep()
+                );
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -62,7 +72,16 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         Request parentRequest = requestRouter.get(request);
         ResponseProducer responseProducer = requestProducers.get(parentRequest);
         responseProducer.requestsToDownstream--;
-        respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
+        Plan responsePlan = answer.plan.endStepCompleted();
+        respondAnswersToUpstream(
+                request,
+                responsePlan,
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers,
+                responseProducer,
+                responsePlan.currentStep()
+        );
 
         // TODO unify and materialise
     }
@@ -76,11 +95,20 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         responseProducer.requestsToDownstream--;
 
         responseProducer.setDownstreamDone();
+        Plan responsePlan = done.plan.endStepCompleted();
 
         if (responseProducer.finished()) {
-            respondDoneToUpstream(parentRequest);
+            respondDoneToUpstream(parentRequest, responsePlan);
         } else {
-            respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
+            respondAnswersToUpstream(
+                    request,
+                    responsePlan,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
         }
     }
 
@@ -103,31 +131,38 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(Plan plan, final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(
+            final Request request,
+            final Plan plan,
+            final List<Long> partialAnswers,
+            final List<Object> constraints,
+            final List<Object> unifiers,
+            final ResponseProducer responseProducer,
+            final Actor<? extends ReasoningActor<?>> upstream
+    ) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
-            Plan shortenedPlan = request.plan.endStepCompleted();
+            List<Long> newAnswers = new ArrayList<>(partialAnswers);
+            newAnswers.add(answer);
             Response.Answer responseAnswer = new Response.Answer(
                     request,
-                    shortenedPlan,
-                    Arrays.asList(answer),
-                    request.constraints,
-                    request.unifiers
+                    plan,
+                    newAnswers,
+                    constraints,
+                    unifiers
             );
 
-            LOG.debug("Responding answer to upstream in: " + name);
+            LOG.debug("Responding answer to upstream from actor: " + name);
             upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
             responseProducer.requestsFromUpstream--;
         }
     }
 
     @Override
-    void respondDoneToUpstream(final Request request) {
-        Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
-        Plan shortenedPlan = request.plan.endStepCompleted();
-        Response.Done responseDone = new Response.Done(request, shortenedPlan);
+    void respondDoneToUpstream(final Request request, final Plan responsePlan) {
+        Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
+        Response.Done responseDone = new Response.Done(request, responsePlan);
         LOG.debug("Responding Done to upstream in: " + name);
         upstream.tell((actor) -> actor.receiveDone(responseDone));
     }

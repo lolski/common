@@ -54,8 +54,9 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
 
+        Plan responsePlan = request.plan.truncate().endStepCompleted();
         if (responseProducer.finished()) {
-            respondDoneToUpstream(request);
+            respondDoneToUpstream(request, responsePlan);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
@@ -63,7 +64,15 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
-                respondAnswersToUpstream();
+                respondAnswersToUpstream(
+                        request,
+                        responsePlan,
+                        request.partialAnswers,
+                        request.constraints,
+                        request.unifiers,
+                        responseProducer,
+                        responsePlan.currentStep()
+                );
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -96,8 +105,15 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         Plan shortenedPlan = answer.plan.endStepCompleted();
 
-        respondAnswersToUpstream(parentRequest, shortenedPlan, parentRequest.partialAnswers,
-                parentRequest.constraints, parentRequest.unifiers, responseProducer, parentRequest.plan.previousStep());
+        respondAnswersToUpstream(
+                parentRequest,
+                shortenedPlan,
+                parentRequest.partialAnswers,
+                parentRequest.constraints,
+                parentRequest.unifiers,
+                responseProducer,
+                shortenedPlan.currentStep()
+        );
     }
 
     @Override
@@ -110,12 +126,21 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         responseProducer.setDownstreamDone();
 
+        Plan responsePlan = done.plan.endStepCompleted();
         if (responseProducer.finished()) {
-            respondDoneToUpstream(parentRequest);
+            respondDoneToUpstream(parentRequest, responsePlan);
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
-            respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
+            respondAnswersToUpstream(
+                    parentRequest,
+                    responsePlan,
+                    parentRequest.partialAnswers,
+                    parentRequest.constraints,
+                    parentRequest.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
         }
     }
 
@@ -168,10 +193,9 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    void respondDoneToUpstream(final Request request) {
-        Actor<? extends ReasoningActor<?>> requester = request.plan.previousStep();
-        Plan shortenedPlan = request.plan.endStepCompleted();
-        Response.Done responseDone = new Response.Done(request, shortenedPlan);
+    void respondDoneToUpstream(final Request request, final Plan responsePlan) {
+        Actor<? extends ReasoningActor<?>> requester = responsePlan.currentStep();
+        Response.Done responseDone = new Response.Done(request, responsePlan);
         LOG.debug("Responding Done to requester from actor: " + name);
         requester.tell((actor) -> actor.receiveDone(responseDone));
     }
@@ -199,7 +223,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         return responseProducer;
     }
 
-    private void registerTraversal(ResponseProducer responseProducer, long partialAnswer) {
+    private void registerTraversal(final ResponseProducer responseProducer, long partialAnswer) {
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(partialAnswer);
         responseProducer.addTraversalProducer(traversal);
     }

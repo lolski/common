@@ -49,8 +49,10 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
 
         ResponseProducer responseProducer = this.requestProducers.get(request);
+        Plan responsePlan = request.plan.truncate().endStepCompleted();
+
         if (responseProducer.finished()) {
-            respondDoneToUpstream(request);
+            respondDoneToUpstream(request, responsePlan);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
@@ -58,7 +60,15 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
-                respondAnswersToUpstream(answer.plan.endStepCompleted(), request, responseProducer);
+                respondAnswersToUpstream(
+                        request,
+                        responsePlan,
+                        request.partialAnswers,
+                        request.constraints,
+                        request.unifiers,
+                        responseProducer,
+                        responsePlan.currentStep()
+                );
             }
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
@@ -81,7 +91,16 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         List<Long> partialAnswers = answer.partialAnswers;
         Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
         responseProducer.answers.add(mergedAnswers);
-        respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
+        Plan newPlan = answer.plan.endStepCompleted();
+        respondAnswersToUpstream(
+                request,
+                newPlan,
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers,
+                responseProducer,
+                newPlan.currentStep()
+        );
     }
 
     @Override
@@ -94,13 +113,22 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
         // every conjunction has exactly 1 downstream, so a done message must indicate the downstream is done
         responseProducer.setDownstreamDone();
+        Plan responsePlan = done.plan.endStepCompleted();
 
         if (responseProducer.finished()) {
-            respondDoneToUpstream(parentRequest);
+            respondDoneToUpstream(parentRequest, responsePlan);
         } else {
             List<Long> answers = produceTraversalAnswers(responseProducer);
             responseProducer.answers.addAll(answers);
-            respondAnswersToUpstream(answer.plan.endStepCompleted(), parentRequest, responseProducer);
+            respondAnswersToUpstream(
+                    request,
+                    responsePlan,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
         }
     }
 
@@ -124,27 +152,33 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(Plan plan, final Request request, final ResponseProducer responseProducer) {
+    void respondAnswersToUpstream(final Request request,
+                                  final Plan plan,
+                                  final List<Long> partialAnswers,
+                                  final List<Object> constraints,
+                                  final List<Object> unifiers,
+                                  final ResponseProducer responseProducer,
+                                  @Nullable final Actor<? extends ReasoningActor<?>> upstream) {
         // send as many answers as possible to requester
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            if (request.plan.atStart()) {
+            if (upstream == null) {
                 // base case - how to return from Actor model
                 assert responses != null : this + ": can't return answers because the user answers queue is null";
                 LOG.debug("Saving answer to output queue in: " + name);
                 responses.add(answer);
             } else {
-                Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
-                Plan shortenedPlan = request.plan.endStepCompleted();
+                List<Long> newAnswers = new ArrayList<>(partialAnswers);
+                newAnswers.add(answer);
                 Response.Answer responseAnswer = new Response.Answer(
                         request,
-                        shortenedPlan,
-                        Arrays.asList(answer),
-                        request.constraints,
-                        request.unifiers
+                        plan,
+                        newAnswers,
+                        constraints,
+                        unifiers
                 );
 
-                LOG.debug("Responding answer to upstream in: " + name);
+                LOG.debug("Responding answer to upstream from actor: " + name);
                 upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
             responseProducer.requestsFromUpstream--;
@@ -152,16 +186,15 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void respondDoneToUpstream(final Request request) {
-        if (request.plan.atStart()) {
+    void respondDoneToUpstream(final Request request, final Plan responsePlan) {
+        if (responsePlan.currentStep() == null) {
             // base case - how to return from Actor model
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             LOG.debug("Writing Done to output queue in: " + name);
             responses.add(-1L);
         } else {
-            Actor<? extends ReasoningActor<?>> upstream = request.plan.previousStep();
-            Plan shortenedPlan = request.plan.endStepCompleted();
-            Response.Done responseDone = new Response.Done(request, shortenedPlan);
+            Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
+            Response.Done responseDone = new Response.Done(request, responsePlan);
             LOG.debug("Responding Done to upstream in: " + name);
             upstream.tell((actor) -> actor.receiveDone(responseDone));
         }
@@ -196,7 +229,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
 
         // plan the atomics in the conjunction
-        return new Plan(planAsActors);
+        return new Plan(planAsActors).toNextStep();
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
