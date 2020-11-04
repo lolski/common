@@ -15,8 +15,6 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
     private final String name;
     private final Actor<ConjunctiveActor> whenActor;
-    private final Map<Request, ResponseProducer> responseProducers;
-    private final Map<Request, Request> requestRouter;
 
     public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
                      final Long whenTraversalSize) {
@@ -25,8 +23,6 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
         name = String.format("RuleActor(pattern:%s)", when);
         whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize, null));
-        requestRouter = new HashMap<>();
-        responseProducers = new HashMap<>();
     }
 
     @Override
@@ -133,8 +129,8 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
         // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.bufferedAnswersSize()); i++) {
-            Long answer = responseProducer.bufferedAnswersTake();
+        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream(), responseProducer.bufferedSize()); i++) {
+            Long answer = responseProducer.bufferTake();
             List<Long> newAnswers = new ArrayList<>(partialAnswers);
             newAnswers.add(answer);
             Response.Answer responseAnswer = new Response.Answer(
@@ -147,7 +143,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
             LOG.debug("Responding answer to upstream from actor: " + name);
             upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
-            responseProducer.requestsFromUpstream--;
+            responseProducer.decrementRequestsFromUpstream();
         }
     }
 
@@ -175,12 +171,12 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     private void bufferAnswer(final Request request, final Long answer) {
-        responseProducers.get(request).bufferedAnswersAdd(Arrays.asList(answer));
+        responseProducers.get(request).bufferAnswer(answer);
     }
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.bufferedAnswersSize();
+        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream() + responseProducer.bufferedSize();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
@@ -188,19 +184,19 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     private void incrementRequestsFromUpstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsFromUpstream++;
+        responseProducers.get(fromUpstream).incrementRequestsFromUpstream();
     }
 
     private void decrementRequestToDownstream(final Request parentRequest) {
-        responseProducers.get(parentRequest).requestsToDownstream--;
+        responseProducers.get(parentRequest).decrementRequestsToDownstream();
     }
 
     private Plan getResponsePlan(final Request fromUpstream) {
         return fromUpstream.plan.endStepCompleted();
     }
 
-    private Plan forwardingPlan(final Response.Answer answer) {
-        return answer.plan.endStepCompleted();
+    private Plan forwardingPlan(final Response.Answer fromDownstream) {
+        return fromDownstream.plan.endStepCompleted();
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {

@@ -19,10 +19,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     private final String name;
     private final Long traversalPattern;
     private final long traversalSize;
-    private final Map<Request, ResponseProducer> responseProducers;
     // TODO EH???? what is the below comment
     // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
-    private final Map<Request, Request> requestRouter;
     private final List<Actor<RuleActor>> ruleActors;
 
     public AtomicActor(final Actor<AtomicActor> self, final ActorRegistry actorRegistry, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
@@ -32,8 +30,6 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         name = "AtomicActor(pattern: " + traversalPattern + ")";
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
-        responseProducers = new HashMap<>();
-        requestRouter = new HashMap<>();
         ruleActors = registerRuleActors(actorRegistry, rules);
     }
 
@@ -141,7 +137,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         Request toDownstream = responseProducer.getAvailableDownstream();
         Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
-        responseProducer.requestsToDownstream++;
+        responseProducer.incrementRequestsToDownstream();
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(toDownstream, fromUpstream);
 
@@ -160,8 +156,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
         // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.bufferedAnswersSize()); i++) {
-            Long answer = responseProducer.bufferedAnswersTake();
+        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream(), responseProducer.bufferedSize()); i++) {
+            Long answer = responseProducer.bufferTake();
             List<Long> newAnswers = list(partialAnswers, answer);
             Response.Answer responseAnswer = new Response.Answer(
                     request,
@@ -173,7 +169,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
             LOG.debug("Responding answer to upstream from actor: " + name);
             upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
-            responseProducer.requestsFromUpstream--;
+            responseProducer.decrementRequestsFromUpstream();
         }
     }
 
@@ -246,7 +242,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private void bufferAnswers(final Request request, final List<Long> answers) {
-        responseProducers.get(request).bufferedAnswersAdd(answers);
+        responseProducers.get(request).bufferAnswers(answers);
     }
 
     private void registerDownstreamRules(final Request request, final Plan basePlan, final List<Long> partialAnswers,
@@ -260,7 +256,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.bufferedAnswersSize();
+        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream() + responseProducer.bufferedSize();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
@@ -268,11 +264,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private void incrementRequestsFromUpstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsFromUpstream++;
+        responseProducers.get(fromUpstream).incrementRequestsFromUpstream();
     }
 
     private void decrementRequestsToDownstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsToDownstream--;
+        responseProducers.get(fromUpstream).decrementRequestsToDownstream();
     }
 
     private Actor<? extends ReasoningActor<?>> answerSource(final Response.Answer answer) {

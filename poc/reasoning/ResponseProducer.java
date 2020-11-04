@@ -8,16 +8,16 @@ import java.util.List;
 
 class ResponseProducer {
     private final List<Request> downstreamsAvailable;
-    List<Iterator<Long>> traversalProducers;
-    private final List<Long> answers;
-    int requestsFromUpstream = 0;
-    int requestsToDownstream = 0;
+    private List<Iterator<Long>> traversalProducers;
+    private final List<Long> bufferedAnswers;
+    private int requestsFromUpstream = 0;
+    private int requestsToDownstream = 0;
 
     public ResponseProducer() {
         this.downstreamsAvailable = new ArrayList<>();
         this.traversalProducers = new ArrayList<>();
         this.traversalProducers = new ArrayList<>();
-        this.answers = new LinkedList<>();
+        this.bufferedAnswers = new LinkedList<>();
     }
 
     public void addTraversalProducer(final Iterator<Long> traversalProducer) {
@@ -35,9 +35,9 @@ class ResponseProducer {
     }
 
     public boolean noMoreAnswersPossible() {
-        boolean finished = downstreamsAvailable.isEmpty() && traversalProducers.isEmpty();
-        if (finished) assert answers.isEmpty() : "Downstream and traversalProducers are finished, answers should already be sent";
-        return finished;
+        boolean isEmpty = downstreamsAvailable.isEmpty() && traversalProducers.isEmpty();
+        if (isEmpty) assert bufferedAnswers.isEmpty() : "Downstream and traversalProducers are finished, answers should already be sent";
+        return isEmpty;
     }
 
     public void addAvailableDownstream(final Request toDownstream) {
@@ -56,15 +56,43 @@ class ResponseProducer {
         downstreamsAvailable.remove(request);
     }
 
-    public void bufferedAnswersAdd(List<Long> answers) {
-        this.answers.addAll(answers);
+    public void bufferAnswers(List<Long> answers) {
+        this.bufferedAnswers.addAll(answers);
     }
 
-    public int bufferedAnswersSize() {
-        return answers.size();
+    public void bufferAnswer(Long answer) {
+        this.bufferedAnswers.add(answer);
     }
 
-    public Long bufferedAnswersTake() {
-        return answers.remove(0);
+    public int bufferedSize() {
+        return bufferedAnswers.size();
+    }
+
+    public Long bufferTake() {
+        return bufferedAnswers.remove(0);
+    }
+
+    public int requestsFromUpstream() {
+        return requestsFromUpstream;
+    }
+
+    public void incrementRequestsFromUpstream() {
+        requestsFromUpstream++;
+    }
+
+    public void decrementRequestsFromUpstream() {
+        requestsFromUpstream--;
+    }
+
+    public int requestsToDownstream() {
+        return requestsToDownstream;
+    }
+
+    public void incrementRequestsToDownstream() {
+        requestsToDownstream++;
+    }
+
+    public void decrementRequestsToDownstream() {
+        requestsToDownstream--;
     }
 }

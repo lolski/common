@@ -24,8 +24,6 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
     private final List<Long> conjunction;
-    private final Map<Request, ResponseProducer> responseProducers;
-    private final Map<Request, Request> requestRouter;
     private final List<Actor<AtomicActor>> plannedAtomics;
 
 
@@ -39,8 +37,6 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         this.traversalSize = traversalSize;
         this.responses = responses;
         this.plannedAtomics = plan(actorRegistry, this.conjunction);
-        responseProducers = new HashMap<>();
-        requestRouter = new HashMap<>();
     }
 
     @Override
@@ -117,7 +113,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
         LOG.debug("Requesting from downstream in: " + name);
         downstream.tell(actor -> actor.receiveRequest(toDownstream));
-        responseProducers.get(fromUpstream).requestsToDownstream++;
+        responseProducers.get(fromUpstream).incrementRequestsToDownstream();
     }
 
     @Override
@@ -129,8 +125,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                                   final ResponseProducer responseProducer,
                                   @Nullable final Actor<? extends ReasoningActor<?>> upstream) {
         // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
-            Long answer = responseProducer.answers.remove(0);
+        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream(), responseProducer.bufferedSize()); i++) {
+            Long answer = responseProducer.bufferTake();
             if (upstream == null) {
                 // base case - how to return from Actor model
                 assert responses != null : this + ": can't return answers because the user answers queue is null";
@@ -149,7 +145,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                 LOG.debug("Responding answer to upstream from actor: " + name);
                 upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
             }
-            responseProducer.requestsFromUpstream--;
+            responseProducer.decrementRequestsFromUpstream();
         }
     }
 
@@ -207,7 +203,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         List<Long> answers = produceTraversalAnswers(responseProducer);
-        responseProducer.answers.addAll(answers);
+        responseProducer.bufferAnswers(answers);
         respondAnswersToUpstream(
                 fromUpstream,
                 responsePlan,
@@ -231,12 +227,12 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private void bufferAnswer(final Request fromUpstream, final Long mergedAnswers) {
-        responseProducers.get(fromUpstream).answers.add(mergedAnswers);
+        responseProducers.get(fromUpstream).bufferAnswer(mergedAnswers);
     }
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream() + responseProducer.bufferedSize();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
@@ -244,19 +240,19 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private void incrementRequestsFromUpstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsFromUpstream++;
+        responseProducers.get(fromUpstream).incrementRequestsFromUpstream();
     }
 
     private void decrementRequestToDownstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsToDownstream--;
+        responseProducers.get(fromUpstream).decrementRequestsToDownstream();
     }
 
     private Plan getResponsePlan(final Request fromUpstream) {
         return fromUpstream.plan.endStepCompleted();
     }
 
-    private Plan forwardingPlan(final Response.Answer answer) {
-        return answer.plan.endStepCompleted();
+    private Plan forwardingPlan(final Response.Answer fromDownstream) {
+        return fromDownstream.plan.endStepCompleted();
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {

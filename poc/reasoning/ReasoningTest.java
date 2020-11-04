@@ -52,7 +52,6 @@ public class ReasoningTest {
         Thread.sleep(20);
     }
 
-
     @Test
     public void doubleAtomicActor() throws InterruptedException {
         ActorRegistry actorRegistry = new ActorRegistry();

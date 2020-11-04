@@ -2,14 +2,20 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.concurrent.actor.Actor;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.State<T>{
     protected final ActorRegistry actorRegistry;
+    protected final Map<Request, ResponseProducer> responseProducers;
+    protected final Map<Request, Request> requestRouter;
 
     protected ReasoningActor(final Actor<T> self, ActorRegistry actorRegistry) {
         super(self);
         this.actorRegistry = actorRegistry;
+        responseProducers = new HashMap<>();
+        requestRouter = new HashMap<>();
     }
 
     public abstract void receiveRequest(final Request fromUpstream);
