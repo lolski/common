@@ -14,7 +14,7 @@ import java.util.Map;
 import static grakn.common.collection.Collections.list;
 
 public class AtomicActor extends ReasoningActor<AtomicActor> {
-    Logger LOG;
+    private final Logger LOG;
 
     private final String name;
     private final Long traversalPattern;
@@ -25,11 +25,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     private final Map<Request, Request> requestRouter;
     private final List<Actor<RuleActor>> ruleActors;
 
-    public AtomicActor(final Actor<AtomicActor> self, ActorRegistry actorRegistry, Long traversalPattern, final long traversalSize, List<List<Long>> rules) {
+    public AtomicActor(final Actor<AtomicActor> self, final ActorRegistry actorRegistry, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
         super(self, actorRegistry);
         LOG = LoggerFactory.getLogger(AtomicActor.class.getSimpleName() + "-" + traversalPattern);
 
-        this.name = "AtomicActor(pattern: " + traversalPattern + ")";
+        name = "AtomicActor(pattern: " + traversalPattern + ")";
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
         responseProducers = new HashMap<>();
@@ -213,7 +213,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
     }
 
-    private void traverseAndRespond(Request fromUpstream, Plan responsePlan) {
+    private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         List<Long> answers = produceTraversalAnswers(responseProducer);
         bufferAnswers(fromUpstream, answers);
@@ -240,12 +240,12 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         return Arrays.asList();
     }
 
-    private void registerTraversal(Request request, Long answer) {
+    private void registerTraversal(final Request request, final Long answer) {
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(answer);
         if (traversal.hasNext()) responseProducers.get(request).addTraversalProducer(traversal);
     }
 
-    private void bufferAnswers(Request request, List<Long> answers) {
+    private void bufferAnswers(final Request request, final List<Long> answers) {
         responseProducers.get(request).answers.addAll(answers);
     }
 
@@ -258,44 +258,44 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
     }
 
-    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
+    private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
     }
 
-    private boolean noMoreAnswersPossible(Request fromUpstream) {
+    private boolean noMoreAnswersPossible(final Request fromUpstream) {
         return responseProducers.get(fromUpstream).finished();
     }
 
-    private void incrementRequestsFromUpstream(Request fromUpstream) {
+    private void incrementRequestsFromUpstream(final Request fromUpstream) {
         responseProducers.get(fromUpstream).requestsFromUpstream++;
     }
 
-    private void decrementRequestsToDownstream(Request fromUpstream) {
+    private void decrementRequestsToDownstream(final Request fromUpstream) {
         responseProducers.get(fromUpstream).requestsToDownstream--;
     }
 
-    private Actor<? extends ReasoningActor<?>> answerSource(Response.Answer answer) {
+    private Actor<? extends ReasoningActor<?>> answerSource(final Response.Answer answer) {
         return answer.sourceRequest().plan.currentStep();
     }
 
-    private Plan getResponsePlan(Request fromUpstream) {
+    private Plan getResponsePlan(final Request fromUpstream) {
         return fromUpstream.plan.truncate().endStepCompleted();
     }
 
-    private Plan forwardingPlan(Response.Answer fromDownstream) {
+    private Plan forwardingPlan(final Response.Answer fromDownstream) {
         return fromDownstream.plan.endStepCompleted();
     }
 
-    private boolean downstreamAvailable(Request fromUpstream) {
+    private boolean downstreamAvailable(final Request fromUpstream) {
         return !responseProducers.get(fromUpstream).isDownstreamDone();
     }
 
-    private void downstreamDone(Request fromUpstream, Request sentDownstream) {
+    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
         responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
     }
 
-    private Long computeAnswer(List<Long> partialAnswers) {
+    private Long computeAnswer(final List<Long> partialAnswers) {
         return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
     }
 }

@@ -17,7 +17,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import static grakn.common.collection.Collections.list;
 
 public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
-    Logger LOG;
+    private final Logger LOG;
 
     private final String name;
     private final List<Long> conjunction;
@@ -29,8 +29,8 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private final Map<Request, Request> requestRouter;
 
 
-    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, ActorRegistry actorRegistry, List<Long> conjunction,
-                               Long traversalSize, LinkedBlockingQueue<Long> responses) {
+    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
+                               final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
         super(self, actorRegistry);
         LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + conjunction);
 
@@ -67,42 +67,6 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
     }
 
-    private boolean downstreamAvailable(Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).isDownstreamDone();
-    }
-
-    private void traverseAndRespond(Request fromUpstream, Plan responsePlan) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        List<Long> answers = produceTraversalAnswers(responseProducer);
-        responseProducer.answers.addAll(answers);
-        respondAnswersToUpstream(
-                fromUpstream,
-                responsePlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducer,
-                responsePlan.currentStep()
-        );
-    }
-
-    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
-    }
-
-    private void incrementRequestsFromUpstream(Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsFromUpstream++;
-    }
-
-    private boolean noMoreAnswersPossible(Request fromUpstream) {
-        return responseProducers.get(fromUpstream).finished();
-    }
-
-    private Plan getResponsePlan(Request fromUpstream) {
-        return fromUpstream.plan.endStepCompleted();
-    }
-
     @Override
     public void receiveAnswer(final Response.Answer fromDownstream) {
         LOG.debug("Received answer response in: " + name);
@@ -112,7 +76,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         decrementRequestToDownstream(fromUpstream);
 
         // directly pass answer response back after combining into a single answer
-        Long mergedAnswers = getAnswer(fromDownstream.partialAnswers);
+        Long mergedAnswers = computeAnswer(fromDownstream.partialAnswers);
         bufferAnswer(fromUpstream, mergedAnswers);
 
         Plan forwardingPlan = forwardingPlan(fromDownstream);
@@ -125,22 +89,6 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                 responseProducers.get(fromUpstream),
                 forwardingPlan.currentStep()
         );
-    }
-
-    private Plan forwardingPlan(Response.Answer answer) {
-        return answer.plan.endStepCompleted();
-    }
-
-    private void bufferAnswer(Request fromUpstream, Long mergedAnswers) {
-        responseProducers.get(fromUpstream).answers.add(mergedAnswers);
-    }
-
-    private Long getAnswer(List<Long> partialAnswers) {
-        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
-    }
-
-    private void decrementRequestToDownstream(Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsToDownstream--;
     }
 
     @Override
@@ -156,10 +104,6 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
         if (noMoreAnswersPossible(fromUpstream))  respondDoneToUpstream(fromUpstream, responsePlan);
         else traverseAndRespond(fromUpstream, responsePlan);
-    }
-
-    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
     }
 
     @Override
@@ -224,23 +168,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         }
     }
 
-    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
-        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        if (traversalProducer != null) {
-            // TODO could do batch traverse, or retrieve answers from multiple traversals
-            Long answer = traversalProducer.next();
-            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-            return Arrays.asList(answer);
-        }
-        return Arrays.asList();
-    }
-
-    /*
-    Given a conjunction, return an ordered list of constraints to traverse
-    The first constraint should be the starting point that finds initial answers
-    before propagating them in the order indicated by the plan
-     */
-    private List<Actor<AtomicActor>> plan(ActorRegistry actorRegistry, List<Long> conjunction) {
+    private List<Actor<AtomicActor>> plan(final ActorRegistry actorRegistry, final List<Long> conjunction) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
         planned = Collections.unmodifiableList(planned);
@@ -274,5 +202,72 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
             if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         }
+    }
+
+    private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        List<Long> answers = produceTraversalAnswers(responseProducer);
+        responseProducer.answers.addAll(answers);
+        respondAnswersToUpstream(
+                fromUpstream,
+                responsePlan,
+                fromUpstream.partialAnswers,
+                fromUpstream.constraints,
+                fromUpstream.unifiers,
+                responseProducer,
+                responsePlan.currentStep()
+        );
+    }
+
+    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
+        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
+        if (traversalProducer != null) {
+            // TODO could do batch traverse, or retrieve answers from multiple traversals
+            Long answer = traversalProducer.next();
+            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
+            return Arrays.asList(answer);
+        }
+        return Arrays.asList();
+    }
+
+    private void bufferAnswer(final Request fromUpstream, final Long mergedAnswers) {
+        responseProducers.get(fromUpstream).answers.add(mergedAnswers);
+    }
+
+    private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+    }
+
+    private boolean noMoreAnswersPossible(final Request fromUpstream) {
+        return responseProducers.get(fromUpstream).finished();
+    }
+
+    private void incrementRequestsFromUpstream(final Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsFromUpstream++;
+    }
+
+    private void decrementRequestToDownstream(final Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsToDownstream--;
+    }
+
+    private Plan getResponsePlan(final Request fromUpstream) {
+        return fromUpstream.plan.endStepCompleted();
+    }
+
+    private Plan forwardingPlan(final Response.Answer answer) {
+        return answer.plan.endStepCompleted();
+    }
+
+    private boolean downstreamAvailable(final Request fromUpstream) {
+        return !responseProducers.get(fromUpstream).isDownstreamDone();
+    }
+
+    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
+    }
+
+    private Long computeAnswer(final List<Long> partialAnswers) {
+        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
     }
 }

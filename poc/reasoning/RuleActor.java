@@ -10,19 +10,19 @@ import java.util.List;
 import java.util.Map;
 
 public class RuleActor extends ReasoningActor<RuleActor> {
-    Logger LOG;
+    private final Logger LOG;
 
     private final Actor<ConjunctiveActor> whenActor;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
     private final String name;
 
-    public RuleActor(final Actor<RuleActor> self, ActorRegistry actorRegistry, List<Long> when,
-                     Long whenTraversalSize) {
+    public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
+                     final Long whenTraversalSize) {
         super(self, actorRegistry);
         LOG = LoggerFactory.getLogger(RuleActor.class.getSimpleName() + "-" + when);
 
-        this.name = String.format("RuleActor(pattern:%s)", when);
+        name = String.format("RuleActor(pattern:%s)", when);
         whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize, null));
         requestRouter = new HashMap<>();
         responseProducers = new HashMap<>();
@@ -60,27 +60,6 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         }
     }
 
-    private boolean downstreamAvailable(Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).isDownstreamDone();
-    }
-
-    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
-    }
-
-    private void incrementRequestsFromUpstream(Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsFromUpstream++;
-    }
-
-    private boolean noMoreAnswersPossible(Request fromUpstream) {
-        return responseProducers.get(fromUpstream).finished();
-    }
-
-    private Plan getResponsePlan(Request fromUpstream) {
-        return fromUpstream.plan.endStepCompleted();
-    }
-
     @Override
     public void receiveAnswer(final Response.Answer fromDownstream) {
         LOG.debug("Received answer response in: " + name);
@@ -89,7 +68,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
         decrementRequestToDownstream(fromUpstream);
 
-        Long mergedAnswer = getAnswer(fromDownstream);
+        Long mergedAnswer = computeAnswer(fromDownstream);
         bufferAnswer(fromUpstream, mergedAnswer);
 
         Plan forwardingPlan = forwardingPlan(fromDownstream);
@@ -104,22 +83,6 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         );
 
         // TODO unify and materialise
-    }
-
-    private Plan forwardingPlan(Response.Answer answer) {
-        return answer.plan.endStepCompleted();
-    }
-
-    private Long getAnswer(Response.Answer answer) {
-        return answer.partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
-    }
-
-    private void bufferAnswer(Request request, Long answer) {
-        responseProducers.get(request).answers.add(answer);
-    }
-
-    private void decrementRequestToDownstream(Request parentRequest) {
-        responseProducers.get(parentRequest).requestsToDownstream--;
     }
 
     @Override
@@ -145,10 +108,6 @@ public class RuleActor extends ReasoningActor<RuleActor> {
                     responsePlan.currentStep()
             );
         }
-    }
-
-    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
     }
 
     @Override
@@ -212,5 +171,46 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             );
             responseProducer.addAvailableDownstream(toDownstream);
         }
+    }
+
+    private void bufferAnswer(final Request request, final Long answer) {
+        responseProducers.get(request).answers.add(answer);
+    }
+
+    private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+    }
+
+    private boolean noMoreAnswersPossible(final Request fromUpstream) {
+        return responseProducers.get(fromUpstream).finished();
+    }
+
+    private void incrementRequestsFromUpstream(final Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsFromUpstream++;
+    }
+
+    private void decrementRequestToDownstream(final Request parentRequest) {
+        responseProducers.get(parentRequest).requestsToDownstream--;
+    }
+
+    private Plan getResponsePlan(final Request fromUpstream) {
+        return fromUpstream.plan.endStepCompleted();
+    }
+
+    private Plan forwardingPlan(final Response.Answer answer) {
+        return answer.plan.endStepCompleted();
+    }
+
+    private boolean downstreamAvailable(final Request fromUpstream) {
+        return !responseProducers.get(fromUpstream).isDownstreamDone();
+    }
+
+    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
+    }
+
+    private Long computeAnswer(final Response.Answer answer) {
+        return answer.partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
     }
 }
