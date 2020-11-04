@@ -5,8 +5,7 @@ import grakn.common.concurrent.actor.Actor;
 import java.util.List;
 
 public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.State<T>{
-
-    final ActorRegistry actorRegistry;
+    protected final ActorRegistry actorRegistry;
 
     protected ReasoningActor(final Actor<T> self, ActorRegistry actorRegistry) {
         super(self);
@@ -29,6 +28,6 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
                                            final ResponseProducer responseProducer,
                                            final Actor<? extends ReasoningActor<?>> upstream);
 
-    abstract void respondDoneToUpstream(final Request request, Plan responsePlan);
+    abstract void respondDoneToUpstream(final Request request, final Plan responsePlan);
 
 }

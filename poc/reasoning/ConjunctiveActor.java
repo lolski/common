@@ -20,13 +20,13 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private final Logger LOG;
 
     private final String name;
-    private final List<Long> conjunction;
-    private final List<Actor<AtomicActor>> plannedAtomics;
     private final Long traversalSize;
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
+    private final List<Long> conjunction;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
+    private final List<Actor<AtomicActor>> plannedAtomics;
 
 
     protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,

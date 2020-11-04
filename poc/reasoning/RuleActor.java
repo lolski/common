@@ -12,10 +12,10 @@ import java.util.Map;
 public class RuleActor extends ReasoningActor<RuleActor> {
     private final Logger LOG;
 
+    private final String name;
     private final Actor<ConjunctiveActor> whenActor;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
-    private final String name;
 
     public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
                      final Long whenTraversalSize) {
