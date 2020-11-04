@@ -56,7 +56,7 @@ class ResponseProducer {
         downstreamsAvailable.remove(request);
     }
 
-    public Request toDownstream() {
+    public Request getAvailableDownstream() {
         return downstreamsAvailable.get(0);
     }
 }

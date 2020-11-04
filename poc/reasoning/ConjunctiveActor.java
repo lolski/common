@@ -46,7 +46,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         LOG.debug("Received request in: " + name);
         assert fromUpstream.plan.atEnd() : "A conjunction that receives a request must be at the end of the plan";
 
-        responseProducers.computeIfAbsent(fromUpstream, key -> initialiseResponseProducer(fromUpstream));
+        initialiseResponseProducer(fromUpstream);
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
@@ -60,7 +60,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             }
 
             if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
-                requestFromDownstream(fromUpstream);
+                requestFromAvailableDownstream(fromUpstream);
             }
         }
     }
@@ -171,9 +171,9 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request fromUpstream) {
+    void requestFromAvailableDownstream(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        Request toDownstream = responseProducer.toDownstream();
+        Request toDownstream = responseProducer.getAvailableDownstream();
         Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
@@ -265,7 +265,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        ResponseProducer responseProducer = new ResponseProducer();
+        ResponseProducer responseProducer = responseProducers.computeIfAbsent(request, key -> new ResponseProducer());
         Plan nextPlan = request.plan.addSteps(this.plannedAtomics).toNextStep();
         Request toDownstream = new Request(
                 nextPlan,

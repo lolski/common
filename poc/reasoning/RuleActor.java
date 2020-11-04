@@ -33,7 +33,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         LOG.debug("Received fromUpstream in: " + name);
         assert fromUpstream.plan.atEnd() : "A rule that receives a fromUpstream must be at the end of the plan";
 
-        responseProducers.computeIfAbsent(fromUpstream, key -> initialiseResponseProducer(fromUpstream));
+        initialiseResponseProducer(fromUpstream);
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
@@ -55,7 +55,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             }
 
             if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
-                requestFromDownstream(fromUpstream);
+                requestFromAvailableDownstream(fromUpstream);
             }
         }
     }
@@ -149,8 +149,8 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request fromUpstream) {
-        Request toDownstream = responseProducers.get(fromUpstream).toDownstream();
+    void requestFromAvailableDownstream(final Request fromUpstream) {
+        Request toDownstream = responseProducers.get(fromUpstream).getAvailableDownstream();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(toDownstream, fromUpstream);
@@ -197,7 +197,8 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     private ResponseProducer initialiseResponseProducer(final Request request) {
-        ResponseProducer responseProducer = new ResponseProducer();
+        ResponseProducer responseProducer = responseProducers.computeIfAbsent(request, key -> new ResponseProducer());
+
         Plan nextStep = request.plan.addStep(whenActor).toNextStep();
         Request toDownstream = new Request(
                 nextStep,
