@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static grakn.common.collection.Collections.list;
+
 public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     Logger LOG;
 
@@ -201,8 +203,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                 LOG.debug("Saving answer to output queue in: " + name);
                 responses.add(answer);
             } else {
-                List<Long> newAnswers = new ArrayList<>(partialAnswers);
-                newAnswers.add(answer);
+                List<Long> newAnswers = list(partialAnswers, answer);
                 Response.Answer responseAnswer = new Response.Answer(
                         request,
                         plan,
@@ -252,6 +253,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private List<Actor<AtomicActor>> plan(ActorRegistry actorRegistry, List<Long> conjunction) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
+        planned = Collections.unmodifiableList(planned);
         List<Actor<AtomicActor>> planAsActors = new ArrayList<>();
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
@@ -264,20 +266,23 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         return planAsActors;
     }
 
-    private ResponseProducer initialiseResponseProducer(final Request request) {
-        ResponseProducer responseProducer = responseProducers.computeIfAbsent(request, key -> new ResponseProducer());
-        Plan nextPlan = request.plan.addSteps(this.plannedAtomics).toNextStep();
-        Request toDownstream = new Request(
-                nextPlan,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers
-        );
-        responseProducer.addAvailableDownstream(toDownstream);
+    private void initialiseResponseProducer(final Request request) {
+        if (!responseProducers.containsKey(request)) {
+            ResponseProducer responseProducer = new ResponseProducer();
+            responseProducers.put(request, responseProducer);
 
-        Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
-        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
-        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
-        return responseProducer;
+            Plan nextPlan = request.plan.addSteps(this.plannedAtomics).toNextStep();
+            Request toDownstream = new Request(
+                    nextPlan,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
+            responseProducer.addAvailableDownstream(toDownstream);
+
+            Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
+            Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
+            if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
+        }
     }
 }

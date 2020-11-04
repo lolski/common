@@ -11,6 +11,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import static grakn.common.collection.Collections.list;
+
 public class AtomicActor extends ReasoningActor<AtomicActor> {
     Logger LOG;
 
@@ -242,8 +244,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         // send as many answers as possible to upstream
         for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
             Long answer = responseProducer.answers.remove(0);
-            List<Long> newAnswers = new ArrayList<>(partialAnswers);
-            newAnswers.add(answer);
+            List<Long> newAnswers = list(partialAnswers, answer);
             Response.Answer responseAnswer = new Response.Answer(
                     request,
                     plan,
@@ -278,30 +279,32 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         return Arrays.asList();
     }
 
-    private ResponseProducer initialiseResponseProducer(final Request request) {
-        ResponseProducer responseProducer = responseProducers.computeIfAbsent(request, key -> new ResponseProducer());
-        boolean hasDownstream = request.plan.nextStep() != null;
-        if (hasDownstream) {
-            Plan nextStep = request.plan.toNextStep();
-            Request toDownstream = new Request(
-                    nextStep,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
-            responseProducer.addAvailableDownstream(toDownstream);
-        } else {
-            registerTraversal(request, computeAnswer(request.partialAnswers));
-            registerRuleDownstreams(
-                    request,
-                    request.plan,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
-        }
+    private void initialiseResponseProducer(final Request request) {
+        if (!responseProducers.containsKey(request)) {
+            ResponseProducer responseProducer = new ResponseProducer();
+            responseProducers.put(request, responseProducer);
 
-        return responseProducer;
+            boolean hasDownstream = request.plan.nextStep() != null;
+            if (hasDownstream) {
+                Plan nextStep = request.plan.toNextStep();
+                Request toDownstream = new Request(
+                        nextStep,
+                        request.partialAnswers,
+                        request.constraints,
+                        request.unifiers
+                );
+                responseProducer.addAvailableDownstream(toDownstream);
+            } else {
+                registerTraversal(request, computeAnswer(request.partialAnswers));
+                registerRuleDownstreams(
+                        request,
+                        request.plan,
+                        request.partialAnswers,
+                        request.constraints,
+                        request.unifiers
+                );
+            }
+        }
     }
 
     private void registerTraversal(Request request, Long answer) {

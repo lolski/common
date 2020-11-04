@@ -196,17 +196,18 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         upstream.tell((actor) -> actor.receiveDone(responseDone));
     }
 
-    private ResponseProducer initialiseResponseProducer(final Request request) {
-        ResponseProducer responseProducer = responseProducers.computeIfAbsent(request, key -> new ResponseProducer());
-
-        Plan nextStep = request.plan.addStep(whenActor).toNextStep();
-        Request toDownstream = new Request(
-                nextStep,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers
-        );
-        responseProducer.addAvailableDownstream(toDownstream);
-        return responseProducer;
+    private void initialiseResponseProducer(final Request request) {
+        if (!responseProducers.containsKey(request)) {
+            ResponseProducer responseProducer = new ResponseProducer();
+            responseProducers.put(request, responseProducer);
+            Plan nextStep = request.plan.addStep(whenActor).toNextStep();
+            Request toDownstream = new Request(
+                    nextStep,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
+            responseProducer.addAvailableDownstream(toDownstream);
+        }
     }
 }

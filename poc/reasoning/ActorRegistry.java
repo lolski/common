@@ -5,7 +5,6 @@ import grakn.common.concurrent.actor.Actor;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class ActorRegistry {
     private ConcurrentHashMap<Long, Actor<AtomicActor>> atomicActors;

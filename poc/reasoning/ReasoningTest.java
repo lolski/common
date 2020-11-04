@@ -31,6 +31,7 @@ public class ReasoningTest {
                 actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(0L), 5L, responses))
         ).awaitUnchecked();
 
+
         long startTime = System.currentTimeMillis();
         long n = 5L + 5L + 1; //total number of traversal answers
         for (int i = 0; i < n; i++) {

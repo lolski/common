@@ -4,6 +4,7 @@ package grakn.common.poc.reasoning;
 import java.util.List;
 import java.util.Objects;
 
+// TODO make immutable, so we can cache hashes
 public class Request {
     final Plan plan;
     final List<Long> partialAnswers;

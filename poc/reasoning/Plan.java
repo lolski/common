@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
+// TODO make this state immutable
 public class Plan {
     private static final int NOT_STARTED = -1;
 
