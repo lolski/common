@@ -13,11 +13,11 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
         this.actorRegistry = actorRegistry;
     }
 
-    public abstract void receiveRequest(final Request request);
+    public abstract void receiveRequest(final Request fromUpstream);
 
-    public abstract void receiveAnswer(final Response.Answer answer);
+    public abstract void receiveAnswer(final Response.Answer fromDownstream);
 
-    public abstract void receiveDone(final Response.Done done);
+    public abstract void receiveDone(final Response.Done fromDownstream);
 
     abstract void requestFromAvailableDownstream(final Request request);
 

@@ -104,18 +104,18 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    public void receiveAnswer(final Response.Answer answer) {
+    public void receiveAnswer(final Response.Answer fromDownstream) {
         LOG.debug("Received answer response in: " + name);
-        Request sentDownstream = answer.sourceRequest();
+        Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
 
         decrementRequestToDownstream(fromUpstream);
 
         // directly pass answer response back after combining into a single answer
-        Long mergedAnswers = getAnswer(answer.partialAnswers);
+        Long mergedAnswers = getAnswer(fromDownstream.partialAnswers);
         bufferAnswer(fromUpstream, mergedAnswers);
 
-        Plan forwardingPlan = forwardingPlan(answer);
+        Plan forwardingPlan = forwardingPlan(fromDownstream);
         respondAnswersToUpstream(
                 fromUpstream,
                 forwardingPlan,
@@ -144,9 +144,9 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    public void receiveDone(final Response.Done done) {
+    public void receiveDone(final Response.Done fromDownstream) {
         LOG.debug("Received done response in: " + name);
-        Request sentDownstream = done.sourceRequest();
+        Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         decrementRequestToDownstream(fromUpstream);
 

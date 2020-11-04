@@ -72,28 +72,28 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    public void receiveAnswer(final Response.Answer answer) {
-        LOG.debug("Received answer response in: " + name);
-        Request sentDownstream = answer.sourceRequest();
+    public void receiveAnswer(final Response.Answer fromDownstream) {
+        LOG.debug("Received fromDownstream response in: " + name);
+        Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
 
         decrementRequestsToDownstream(fromUpstream);
 
-        Plan forwardingPlan = forwardingPlan(answer);
+        Plan forwardingPlan = forwardingPlan(fromDownstream);
 
         // TODO fix accessing state
-        if (answerSource(answer).state instanceof AtomicActor) {
-            registerTraversal(fromUpstream, computeAnswer(answer.partialAnswers));
+        if (answerSource(fromDownstream).state instanceof AtomicActor) {
+            registerTraversal(fromUpstream, computeAnswer(fromDownstream.partialAnswers));
             traverseAndRespond(fromUpstream, forwardingPlan);
-            registerRuleDownstreams(
+            registerDownstreamRules(
                     fromUpstream,
-                    answer.plan,
-                    answer.partialAnswers,
-                    answer.constraints,
-                    answer.unifiers
+                    fromDownstream.plan,
+                    fromDownstream.partialAnswers,
+                    fromDownstream.constraints,
+                    fromDownstream.unifiers
             );
-        } else if (answerSource(answer).state instanceof RuleActor) {
-            bufferAnswers(fromUpstream, Arrays.asList(computeAnswer(answer.partialAnswers)));
+        } else if (answerSource(fromDownstream).state instanceof RuleActor) {
+            bufferAnswers(fromUpstream, Arrays.asList(computeAnswer(fromDownstream.partialAnswers)));
             respondAnswersToUpstream(
                     fromUpstream,
                     forwardingPlan,
@@ -116,9 +116,9 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    public void receiveDone(final Response.Done done) {
-        LOG.debug("Received done response in: " + name);
-        Request sentDownstream = done.sourceRequest();
+    public void receiveDone(final Response.Done fromDownstream) {
+        LOG.debug("Received fromDownstream response in: " + name);
+        Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         decrementRequestsToDownstream(fromUpstream);
 
@@ -202,7 +202,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                 responseProducer.addAvailableDownstream(toDownstream);
             } else {
                 registerTraversal(request, computeAnswer(request.partialAnswers));
-                registerRuleDownstreams(
+                registerDownstreamRules(
                         request,
                         request.plan,
                         request.partialAnswers,
@@ -249,20 +249,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         responseProducers.get(request).answers.addAll(answers);
     }
 
-    private void registerRuleDownstreams(
-            final Request request,
-            final Plan basePlan,
-            final List<Long> partialAnswers,
-            final List<Object> constraints,
-            final List<Object> unifiers) {
+    private void registerDownstreamRules(final Request request, final Plan basePlan, final List<Long> partialAnswers,
+                                         final List<Object> constraints, final List<Object> unifiers) {
         for (Actor<RuleActor> ruleActor : ruleActors) {
             Plan toRule = basePlan.addStep(ruleActor).toNextStep();
-            Request toDownstream = new Request(
-                    toRule,
-                    partialAnswers,
-                    constraints,
-                    unifiers
-            );
+            Request toDownstream = new Request(toRule, partialAnswers, constraints, unifiers);
             responseProducers.get(request).addAvailableDownstream(toDownstream);
         }
     }
@@ -292,8 +283,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         return fromUpstream.plan.truncate().endStepCompleted();
     }
 
-    private Plan forwardingPlan(Response.Answer answer) {
-        return answer.plan.endStepCompleted();
+    private Plan forwardingPlan(Response.Answer fromDownstream) {
+        return fromDownstream.plan.endStepCompleted();
     }
 
     private boolean downstreamAvailable(Request fromUpstream) {

@@ -82,17 +82,17 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    public void receiveAnswer(final Response.Answer answer) {
+    public void receiveAnswer(final Response.Answer fromDownstream) {
         LOG.debug("Received answer response in: " + name);
-        Request sentDownstream = answer.sourceRequest();
+        Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
 
         decrementRequestToDownstream(fromUpstream);
 
-        Long mergedAnswer = getAnswer(answer);
+        Long mergedAnswer = getAnswer(fromDownstream);
         bufferAnswer(fromUpstream, mergedAnswer);
 
-        Plan forwardingPlan = forwardingPlan(answer);
+        Plan forwardingPlan = forwardingPlan(fromDownstream);
         respondAnswersToUpstream(
                 fromUpstream,
                 forwardingPlan,
@@ -123,9 +123,9 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    public void receiveDone(final Response.Done done) {
+    public void receiveDone(final Response.Done fromDownstream) {
         LOG.debug("Received done response in: " + name);
-        Request sentDownstream = done.sourceRequest();
+        Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         decrementRequestToDownstream(fromUpstream);
 
