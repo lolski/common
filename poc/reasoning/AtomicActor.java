@@ -71,51 +71,6 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
     }
 
-    private boolean downstreamAvailable(Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).isDownstreamDone();
-    }
-
-    private void traverseAndRespond(Request fromUpstream, Plan responsePlan) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        List<Long> answers = produceTraversalAnswers(responseProducer);
-        bufferAnswers(fromUpstream, answers);
-        respondAnswersToUpstream(
-                fromUpstream,
-                responsePlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducer,
-                responsePlan.currentStep()
-        );
-    }
-
-    private void bufferAnswers(Request request, List<Long> answers) {
-        responseProducers.get(request).answers.addAll(answers);
-    }
-
-    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
-    }
-
-    private void incrementRequestsFromUpstream(Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsFromUpstream++;
-    }
-
-    private boolean noMoreAnswersPossible(Request fromUpstream) {
-        return responseProducers.get(fromUpstream).finished();
-    }
-
-    private Plan getResponsePlan(Request fromUpstream) {
-        return fromUpstream.plan.truncate().endStepCompleted();
-    }
-
-    /*
-    When a receive and answer and pass the answer forward
-    We map the request that generated the answer, to the originating request.
-    We then copy the originating request, and clear the request path, as it must already have been satisfied.
-     */
     @Override
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
@@ -149,7 +104,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                     forwardingPlan.currentStep()
             );
         } else {
-            throw new RuntimeException("Unhandled downstream actor of type " + sentDownstream.plan.nextStep().state.getClass().getSimpleName());
+            throw new RuntimeException("Unhandled downstream actor of type " +
+                    sentDownstream.plan.nextStep().state.getClass().getSimpleName());
         }
 
         if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
@@ -157,40 +113,6 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
 
         if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, getResponsePlan(fromUpstream));
-    }
-
-    private Actor<? extends ReasoningActor<?>> answerSource(Response.Answer answer) {
-        return answer.sourceRequest().plan.currentStep();
-    }
-
-    private Long computeAnswer(List<Long> partialAnswers) {
-        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
-    }
-
-    private Plan forwardingPlan(Response.Answer answer) {
-        return answer.plan.endStepCompleted();
-    }
-
-    private void decrementRequestsToDownstream(Request fromUpstream) {
-        responseProducers.get(fromUpstream).requestsToDownstream--;
-    }
-
-    private void registerRuleDownstreams(
-            final Request request,
-            final Plan basePlan,
-            final List<Long> partialAnswers,
-            final List<Object> constraints,
-            final List<Object> unifiers) {
-        for (Actor<RuleActor> ruleActor : ruleActors) {
-            Plan toRule = basePlan.addStep(ruleActor).toNextStep();
-            Request toDownstream = new Request(
-                    toRule,
-                    partialAnswers,
-                    constraints,
-                    unifiers
-            );
-            responseProducers.get(request).addAvailableDownstream(toDownstream);
-        }
     }
 
     @Override
@@ -212,10 +134,6 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                 requestFromAvailableDownstream(fromUpstream);
             }
         }
-    }
-
-    private void downstreamDone(Request fromUpstream, Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
     }
 
     @Override
@@ -267,18 +185,6 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         upstream.tell((actor) -> actor.receiveDone(responseDone));
     }
 
-    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
-        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        if (traversalProducer != null) {
-            // TODO could do batch traverse, or retrieve answers from multiple traversals
-            Long answer = traversalProducer.next();
-            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-            answer += this.traversalPattern;
-            return Arrays.asList(answer);
-        }
-        return Arrays.asList();
-    }
-
     private void initialiseResponseProducer(final Request request) {
         if (!responseProducers.containsKey(request)) {
             ResponseProducer responseProducer = new ResponseProducer();
@@ -307,9 +213,99 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         }
     }
 
+    private void traverseAndRespond(Request fromUpstream, Plan responsePlan) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        List<Long> answers = produceTraversalAnswers(responseProducer);
+        bufferAnswers(fromUpstream, answers);
+        respondAnswersToUpstream(
+                fromUpstream,
+                responsePlan,
+                fromUpstream.partialAnswers,
+                fromUpstream.constraints,
+                fromUpstream.unifiers,
+                responseProducer,
+                responsePlan.currentStep()
+        );
+    }
+
+    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
+        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
+        if (traversalProducer != null) {
+            // TODO could do batch traverse, or retrieve answers from multiple traversals
+            Long answer = traversalProducer.next();
+            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
+            answer += this.traversalPattern;
+            return Arrays.asList(answer);
+        }
+        return Arrays.asList();
+    }
+
     private void registerTraversal(Request request, Long answer) {
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(answer);
         if (traversal.hasNext()) responseProducers.get(request).addTraversalProducer(traversal);
+    }
+
+    private void bufferAnswers(Request request, List<Long> answers) {
+        responseProducers.get(request).answers.addAll(answers);
+    }
+
+    private void registerRuleDownstreams(
+            final Request request,
+            final Plan basePlan,
+            final List<Long> partialAnswers,
+            final List<Object> constraints,
+            final List<Object> unifiers) {
+        for (Actor<RuleActor> ruleActor : ruleActors) {
+            Plan toRule = basePlan.addStep(ruleActor).toNextStep();
+            Request toDownstream = new Request(
+                    toRule,
+                    partialAnswers,
+                    constraints,
+                    unifiers
+            );
+            responseProducers.get(request).addAvailableDownstream(toDownstream);
+        }
+    }
+
+    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+    }
+
+    private boolean noMoreAnswersPossible(Request fromUpstream) {
+        return responseProducers.get(fromUpstream).finished();
+    }
+
+    private void incrementRequestsFromUpstream(Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsFromUpstream++;
+    }
+
+    private void decrementRequestsToDownstream(Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsToDownstream--;
+    }
+
+    private Actor<? extends ReasoningActor<?>> answerSource(Response.Answer answer) {
+        return answer.sourceRequest().plan.currentStep();
+    }
+
+    private Plan getResponsePlan(Request fromUpstream) {
+        return fromUpstream.plan.truncate().endStepCompleted();
+    }
+
+    private Plan forwardingPlan(Response.Answer answer) {
+        return answer.plan.endStepCompleted();
+    }
+
+    private boolean downstreamAvailable(Request fromUpstream) {
+        return !responseProducers.get(fromUpstream).isDownstreamDone();
+    }
+
+    private void downstreamDone(Request fromUpstream, Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
+    }
+
+    private Long computeAnswer(List<Long> partialAnswers) {
+        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
     }
 }
 
