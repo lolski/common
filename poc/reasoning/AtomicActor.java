@@ -194,7 +194,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request, responseProducer);
+                    requestFromDownstream(fromUpstream, responseProducer);
                 }
             }
         }

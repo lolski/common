@@ -212,7 +212,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (1*1) + (1*1) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
+        long n = 0L + (1*1) + (1*2) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.receiveRequest(
