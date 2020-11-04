@@ -33,37 +33,52 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         LOG.debug("Received fromUpstream in: " + name);
         assert fromUpstream.plan.atEnd() : "A rule that receives a fromUpstream must be at the end of the plan";
 
-        if (!this.responseProducers.containsKey(fromUpstream)) {
-            this.responseProducers.put(fromUpstream, initialiseResponseProducer(fromUpstream));
-        }
+        responseProducers.computeIfAbsent(fromUpstream, key -> initialiseResponseProducer(fromUpstream));
 
-        ResponseProducer responseProducer = this.responseProducers.get(fromUpstream);
-        Plan responsePlan = fromUpstream.plan.endStepCompleted();
+        Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (responseProducer.finished()) {
-            respondDoneToUpstream(fromUpstream, responsePlan);
-        } else {
+        if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, responsePlan);
+        else {
             // TODO if we want batching, we increment by as many as are requested
-            responseProducer.requestsFromUpstream++;
+            incrementRequestsFromUpstream(fromUpstream);
 
-            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
+            if (upstreamHasRequestsOutstanding(fromUpstream)) {
                 respondAnswersToUpstream(
                         fromUpstream,
                         responsePlan,
                         fromUpstream.partialAnswers,
                         fromUpstream.constraints,
                         fromUpstream.unifiers,
-                        responseProducer,
+                        responseProducers.get(fromUpstream),
                         responsePlan.currentStep()
                 );
             }
 
-            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(fromUpstream);
-                }
+            if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
+                requestFromDownstream(fromUpstream);
             }
         }
+    }
+
+    private boolean downstreamAvailable(Request fromUpstream) {
+        return !responseProducers.get(fromUpstream).isDownstreamDone();
+    }
+
+    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+    }
+
+    private void incrementRequestsFromUpstream(Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsFromUpstream++;
+    }
+
+    private boolean noMoreAnswersPossible(Request fromUpstream) {
+        return responseProducers.get(fromUpstream).finished();
+    }
+
+    private Plan getResponsePlan(Request fromUpstream) {
+        return fromUpstream.plan.endStepCompleted();
     }
 
     @Override

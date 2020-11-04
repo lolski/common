@@ -49,39 +49,60 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     @Override
     public void receiveRequest(final Request fromUpstream) {
         LOG.debug("Received fromUpstream in: " + name);
-        if (!this.responseProducers.containsKey(fromUpstream)) {
-            this.responseProducers.put(fromUpstream, initialiseResponseProducer(fromUpstream));
-        }
 
-        ResponseProducer responseProducer = this.responseProducers.get(fromUpstream);
+        responseProducers.computeIfAbsent(fromUpstream, key -> initialiseResponseProducer(fromUpstream));
 
-        Plan responsePlan = fromUpstream.plan.truncate().endStepCompleted();
-        if (responseProducer.finished()) {
-            respondDoneToUpstream(fromUpstream, responsePlan);
-        } else {
+        Plan responsePlan = getResponsePlan(fromUpstream);
+
+        if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, responsePlan);
+        else {
             // TODO if we want batching, we increment by as many as are requested
-            responseProducer.requestsFromUpstream++;
+            incrementRequestsFromUpstream(fromUpstream);
 
-            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                List<Long> answers = produceTraversalAnswers(responseProducer);
-                responseProducer.answers.addAll(answers);
-                respondAnswersToUpstream(
-                        fromUpstream,
-                        responsePlan,
-                        fromUpstream.partialAnswers,
-                        fromUpstream.constraints,
-                        fromUpstream.unifiers,
-                        responseProducer,
-                        responsePlan.currentStep()
-                );
+            if (upstreamHasRequestsOutstanding(fromUpstream)) {
+                traverseAndRespond(fromUpstream, responsePlan);
             }
 
-            if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
-                if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(fromUpstream);
-                }
+            if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
+                requestFromDownstream(fromUpstream);
             }
         }
+    }
+
+    private boolean downstreamAvailable(Request fromUpstream) {
+        return !responseProducers.get(fromUpstream).isDownstreamDone();
+    }
+
+    private void traverseAndRespond(Request fromUpstream, Plan responsePlan) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        List<Long> answers = produceTraversalAnswers(responseProducer);
+        responseProducer.answers.addAll(answers);
+        respondAnswersToUpstream(
+                fromUpstream,
+                responsePlan,
+                fromUpstream.partialAnswers,
+                fromUpstream.constraints,
+                fromUpstream.unifiers,
+                responseProducer,
+                responsePlan.currentStep()
+        );
+    }
+
+    private boolean upstreamHasRequestsOutstanding(Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+    }
+
+    private void incrementRequestsFromUpstream(Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsFromUpstream++;
+    }
+
+    private boolean noMoreAnswersPossible(Request fromUpstream) {
+        return responseProducers.get(fromUpstream).finished();
+    }
+
+    private Plan getResponsePlan(Request fromUpstream) {
+        return fromUpstream.plan.truncate().endStepCompleted();
     }
 
     /*
