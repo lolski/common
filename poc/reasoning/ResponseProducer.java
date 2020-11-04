@@ -7,9 +7,9 @@ import java.util.LinkedList;
 import java.util.List;
 
 class ResponseProducer {
-    private List<Request> downstreamsAvailable;
+    private final List<Request> downstreamsAvailable;
     List<Iterator<Long>> traversalProducers;
-    List<Long> answers;
+    private final List<Long> answers;
     int requestsFromUpstream = 0;
     int requestsToDownstream = 0;
 
@@ -20,8 +20,12 @@ class ResponseProducer {
         this.answers = new LinkedList<>();
     }
 
-    public void addTraversalProducer(Iterator<Long> traversalProducer) {
+    public void addTraversalProducer(final Iterator<Long> traversalProducer) {
         traversalProducers.add(traversalProducer);
+    }
+
+    public void removeTraversalProducer(final Iterator<Long> traversalProducer) {
+        traversalProducers.remove(traversalProducer);
     }
 
     @Nullable
@@ -30,29 +34,37 @@ class ResponseProducer {
         return null;
     }
 
-    public void removeTraversalProducer(Iterator<Long> traversalProducer) {
-        traversalProducers.remove(traversalProducer);
-    }
-
-    public boolean finished() {
+    public boolean noMoreAnswersPossible() {
         boolean finished = downstreamsAvailable.isEmpty() && traversalProducers.isEmpty();
         if (finished) assert answers.isEmpty() : "Downstream and traversalProducers are finished, answers should already be sent";
         return finished;
-    }
-
-    public boolean isDownstreamDone() {
-        return downstreamsAvailable.isEmpty();
     }
 
     public void addAvailableDownstream(final Request toDownstream) {
         downstreamsAvailable.add(toDownstream);
     }
 
+    public Request getAvailableDownstream() {
+        return downstreamsAvailable.get(0);
+    }
+
+    public boolean downstreamDone() {
+        return downstreamsAvailable.isEmpty();
+    }
+
     public void downstreamDone(final Request request) {
         downstreamsAvailable.remove(request);
     }
 
-    public Request getAvailableDownstream() {
-        return downstreamsAvailable.get(0);
+    public void bufferedAnswersAdd(List<Long> answers) {
+        this.answers.addAll(answers);
+    }
+
+    public int bufferedAnswersSize() {
+        return answers.size();
+    }
+
+    public Long bufferedAnswersTake() {
+        return answers.remove(0);
     }
 }

@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,8 +133,8 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
         // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
-            Long answer = responseProducer.answers.remove(0);
+        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.bufferedAnswersSize()); i++) {
+            Long answer = responseProducer.bufferedAnswersTake();
             List<Long> newAnswers = new ArrayList<>(partialAnswers);
             newAnswers.add(answer);
             Response.Answer responseAnswer = new Response.Answer(
@@ -174,16 +175,16 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     private void bufferAnswer(final Request request, final Long answer) {
-        responseProducers.get(request).answers.add(answer);
+        responseProducers.get(request).bufferedAnswersAdd(Arrays.asList(answer));
     }
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.bufferedAnswersSize();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
-        return responseProducers.get(fromUpstream).finished();
+        return responseProducers.get(fromUpstream).noMoreAnswersPossible();
     }
 
     private void incrementRequestsFromUpstream(final Request fromUpstream) {
@@ -203,7 +204,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).isDownstreamDone();
+        return !responseProducers.get(fromUpstream).downstreamDone();
     }
 
     private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {

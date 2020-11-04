@@ -160,8 +160,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
         // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.answers.size()); i++) {
-            Long answer = responseProducer.answers.remove(0);
+        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream, responseProducer.bufferedAnswersSize()); i++) {
+            Long answer = responseProducer.bufferedAnswersTake();
             List<Long> newAnswers = list(partialAnswers, answer);
             Response.Answer responseAnswer = new Response.Answer(
                     request,
@@ -246,7 +246,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private void bufferAnswers(final Request request, final List<Long> answers) {
-        responseProducers.get(request).answers.addAll(answers);
+        responseProducers.get(request).bufferedAnswersAdd(answers);
     }
 
     private void registerDownstreamRules(final Request request, final Plan basePlan, final List<Long> partialAnswers,
@@ -260,11 +260,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size();
+        return responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.bufferedAnswersSize();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
-        return responseProducers.get(fromUpstream).finished();
+        return responseProducers.get(fromUpstream).noMoreAnswersPossible();
     }
 
     private void incrementRequestsFromUpstream(final Request fromUpstream) {
@@ -288,7 +288,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).isDownstreamDone();
+        return !responseProducers.get(fromUpstream).downstreamDone();
     }
 
     private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {

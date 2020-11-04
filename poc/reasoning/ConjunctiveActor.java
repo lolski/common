@@ -240,7 +240,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
-        return responseProducers.get(fromUpstream).finished();
+        return responseProducers.get(fromUpstream).noMoreAnswersPossible();
     }
 
     private void incrementRequestsFromUpstream(final Request fromUpstream) {
@@ -260,7 +260,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).isDownstreamDone();
+        return !responseProducers.get(fromUpstream).downstreamDone();
     }
 
     private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
