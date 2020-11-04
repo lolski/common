@@ -1,9 +1,8 @@
 package grakn.common.poc;
 
-import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
-import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
+import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -16,7 +15,7 @@ import java.util.Iterator;
 public class CooperativeTest {
 
     public static void main(String[] args) throws InterruptedException {
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(CooperativeTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         ArrayList<Long> output = new ArrayList<>();
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
         Actor<CooperativeStarter> starter = rootActor.ask(root -> root.<CooperativeStarter>createActor((self) -> new CooperativeStarter(self, output))).await();

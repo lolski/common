@@ -3,7 +3,7 @@ package grakn.common.poc.reasoning;
 import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
-import grakn.common.concurrent.actor.eventloop.EventLoopSingleThreaded;
+import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -18,7 +18,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -57,7 +57,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -102,7 +102,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -146,7 +146,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -188,7 +188,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -237,7 +237,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -283,7 +283,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopSingleThreaded eventLoop = new EventLoopSingleThreaded(NamedThreadFactory.create(ReasoningTest.class, "main"));
+        EventLoopGroup eventLoop = new EventLoopGroup(6, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
