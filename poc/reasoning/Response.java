@@ -3,7 +3,7 @@ package grakn.common.poc.reasoning;
 import java.util.List;
 
 interface Response {
-    Request request();
+    Request sourceRequest();
 
     class Done implements Response {
         private final Request request;
@@ -15,7 +15,7 @@ interface Response {
         }
 
         @Override
-        public Request request() {
+        public Request sourceRequest() {
             return request;
         }
 
@@ -41,7 +41,7 @@ interface Response {
         }
 
         @Override
-        public Request request() {
+        public Request sourceRequest() {
             return request;
         }
 

@@ -113,7 +113,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     @Override
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
-        Request request = answer.request();
+        Request request = answer.sourceRequest();
         Request fromUpstream = requestRouter.get(request);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
@@ -190,7 +190,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     @Override
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
-        Request request = done.request();
+        Request request = done.sourceRequest();
         Request fromUpstream = requestRouter.get(request);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;

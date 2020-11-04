@@ -104,31 +104,47 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     @Override
     public void receiveAnswer(final Response.Answer answer) {
         LOG.debug("Received answer response in: " + name);
-        Request request = answer.request();
-        Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        responseProducer.requestsToDownstream--;
+        Request sentDownstream = answer.sourceRequest();
+        Request fromUpstream = requestRouter.get(sentDownstream);
+
+        decrementRequestToDownstream(fromUpstream);
 
         // directly pass answer response back after combining into a single answer
-        List<Long> partialAnswers = answer.partialAnswers;
-        Long mergedAnswers = partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
-        responseProducer.answers.add(mergedAnswers);
-        Plan newPlan = answer.plan.endStepCompleted();
+        Long mergedAnswers = getAnswer(answer.partialAnswers);
+        bufferAnswer(fromUpstream, mergedAnswers);
+
+        Plan forwardingPlan = forwardingPlan(answer);
         respondAnswersToUpstream(
                 fromUpstream,
-                newPlan,
+                forwardingPlan,
                 fromUpstream.partialAnswers,
                 fromUpstream.constraints,
                 fromUpstream.unifiers,
-                responseProducer,
-                newPlan.currentStep()
+                responseProducers.get(fromUpstream),
+                forwardingPlan.currentStep()
         );
+    }
+
+    private Plan forwardingPlan(Response.Answer answer) {
+        return answer.plan.endStepCompleted();
+    }
+
+    private void bufferAnswer(Request fromUpstream, Long mergedAnswers) {
+        responseProducers.get(fromUpstream).answers.add(mergedAnswers);
+    }
+
+    private Long getAnswer(List<Long> partialAnswers) {
+        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
+    }
+
+    private void decrementRequestToDownstream(Request fromUpstream) {
+        responseProducers.get(fromUpstream).requestsToDownstream--;
     }
 
     @Override
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
-        Request request = done.request();
+        Request request = done.sourceRequest();
         Request fromUpstream = requestRouter.get(request);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
