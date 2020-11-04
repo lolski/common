@@ -22,7 +22,7 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
 
     public abstract void receiveAnswer(final Response.Answer fromDownstream);
 
-    public abstract void receiveDone(final Response.Done fromDownstream);
+    public abstract void receiveExhausted(final Response.Exhausted fromDownstream);
 
     abstract void requestFromAvailableDownstream(final Request request);
 
@@ -34,6 +34,6 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
                                            final ResponseProducer responseProducer,
                                            final Actor<? extends ReasoningActor<?>> upstream);
 
-    abstract void respondDoneToUpstream(final Request request, final Plan responsePlan);
+    abstract void respondExhaustedToUpstream(final Request request, final Plan responsePlan);
 
 }

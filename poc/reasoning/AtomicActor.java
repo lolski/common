@@ -6,10 +6,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 import static grakn.common.collection.Collections.list;
 
@@ -52,7 +50,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, responsePlan);
+        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
         else {
             // TODO if we want batching, we increment by as many as are requested
             incrementRequestsFromUpstream(fromUpstream);
@@ -108,21 +106,21 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             requestFromAvailableDownstream(fromUpstream);
         }
 
-        if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, getResponsePlan(fromUpstream));
+        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, getResponsePlan(fromUpstream));
     }
 
     @Override
-    public void receiveDone(final Response.Done fromDownstream) {
+    public void receiveExhausted(final Response.Exhausted fromDownstream) {
         LOG.debug("Received fromDownstream response in: " + name);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         decrementRequestsToDownstream(fromUpstream);
 
-        downstreamDone(fromUpstream, sentDownstream);
+        downstreamExhausted(fromUpstream, sentDownstream);
 
         Plan responsePlan = getResponsePlan(fromUpstream);
         if (noMoreAnswersPossible(fromUpstream)) {
-            respondDoneToUpstream(fromUpstream, responsePlan);
+            respondExhaustedToUpstream(fromUpstream, responsePlan);
         } else {
             traverseAndRespond(fromUpstream, responsePlan);
 
@@ -174,11 +172,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    void respondDoneToUpstream(final Request request, final Plan responsePlan) {
+    void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
         Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
-        Response.Done responseDone = new Response.Done(request, responsePlan);
-        LOG.debug("Responding Done to upstream from actor: " + name);
-        upstream.tell((actor) -> actor.receiveDone(responseDone));
+        Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
+        LOG.debug("Responding Exhausted to upstream from actor: " + name);
+        upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
     }
 
     private void initialiseResponseProducer(final Request request) {
@@ -284,11 +282,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).downstreamDone();
+        return !responseProducers.get(fromUpstream).downstreamExhausted();
     }
 
-    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
+    private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
     }
 
     private Long computeAnswer(final List<Long> partialAnswers) {

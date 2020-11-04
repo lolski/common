@@ -8,10 +8,8 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.list;
@@ -48,7 +46,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, responsePlan);
+        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
         else {
             // TODO if we want batching, we increment by as many as are requested
             incrementRequestsFromUpstream(fromUpstream);
@@ -88,17 +86,17 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    public void receiveDone(final Response.Done fromDownstream) {
-        LOG.debug("Received done response in: " + name);
+    public void receiveExhausted(final Response.Exhausted fromDownstream) {
+        LOG.debug("Received response exhausted in: " + name);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         decrementRequestToDownstream(fromUpstream);
 
-        // every conjunction has exactly 1 downstream, so a done message must indicate the downstream is done
-        downstreamDone(fromUpstream, sentDownstream);
+        // every conjunction has exactly 1 downstream, so an exhausted message must indicate the downstream is exhausted
+        downstreamExhausted(fromUpstream, sentDownstream);
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream))  respondDoneToUpstream(fromUpstream, responsePlan);
+        if (noMoreAnswersPossible(fromUpstream))  respondExhaustedToUpstream(fromUpstream, responsePlan);
         else traverseAndRespond(fromUpstream, responsePlan);
     }
 
@@ -150,17 +148,17 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void respondDoneToUpstream(final Request request, final Plan responsePlan) {
+    void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
         if (responsePlan.currentStep() == null) {
             // base case - how to return from Actor model
             assert responses != null : this + ": can't return answers because the user answers queue is null";
-            LOG.debug("Writing Done to output queue in: " + name);
+            LOG.debug("Writing Exhausted to output queue in: " + name);
             responses.add(-1L);
         } else {
             Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
-            Response.Done responseDone = new Response.Done(request, responsePlan);
-            LOG.debug("Responding Done to upstream in: " + name);
-            upstream.tell((actor) -> actor.receiveDone(responseDone));
+            Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
+            LOG.debug("Responding Exhausted to upstream in: " + name);
+            upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
         }
     }
 
@@ -256,11 +254,11 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).downstreamDone();
+        return !responseProducers.get(fromUpstream).downstreamExhausted();
     }
 
-    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
+    private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
     }
 
     private Long computeAnswer(final List<Long> partialAnswers) {

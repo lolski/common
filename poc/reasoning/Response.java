@@ -5,35 +5,19 @@ import java.util.List;
 interface Response {
     Request sourceRequest();
 
-    class Done implements Response {
-        private final Request request;
-        final Plan plan;
-
-        public Done(final Request request, final Plan plan) {
-            this.request = request;
-            this.plan = plan;
-        }
-
-        @Override
-        public Request sourceRequest() {
-            return request;
-        }
-
-    }
-
     class Answer implements Response {
+        private final Request sourceRequest;
         final Plan plan;
         final List<Long> partialAnswers;
         final List<Object> constraints;
         final List<Object> unifiers;
-        private final Request request;
 
-        public Answer(final Request request,
+        public Answer(final Request sourceRequest,
                       final Plan plan,
                       final List<Long> partialAnswers,
                       final List<Object> constraints,
                       final List<Object> unifiers) {
-            this.request = request;
+            this.sourceRequest = sourceRequest;
             this.plan = plan;
             this.partialAnswers = partialAnswers;
             this.constraints = constraints;
@@ -42,7 +26,23 @@ interface Response {
 
         @Override
         public Request sourceRequest() {
-            return request;
+            return sourceRequest;
+        }
+
+    }
+
+    class Exhausted implements Response {
+        private final Request sourceRequest;
+        final Plan plan;
+
+        public Exhausted(final Request sourceRequest, final Plan plan) {
+            this.sourceRequest = sourceRequest;
+            this.plan = plan;
+        }
+
+        @Override
+        public Request sourceRequest() {
+            return sourceRequest;
         }
 
     }

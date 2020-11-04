@@ -5,10 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class RuleActor extends ReasoningActor<RuleActor> {
     private final Logger LOG;
@@ -34,7 +31,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondDoneToUpstream(fromUpstream, responsePlan);
+        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
         else {
             // TODO if we want batching, we increment by as many as are requested
             incrementRequestsFromUpstream(fromUpstream);
@@ -83,17 +80,17 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    public void receiveDone(final Response.Done fromDownstream) {
-        LOG.debug("Received done response in: " + name);
+    public void receiveExhausted(final Response.Exhausted fromDownstream) {
+        LOG.debug("Received exhausted response in: " + name);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         decrementRequestToDownstream(fromUpstream);
 
-        downstreamDone(fromUpstream, sentDownstream);
+        downstreamExhausted(fromUpstream, sentDownstream);
         Plan responsePlan = getResponsePlan(fromUpstream);
 
         if (noMoreAnswersPossible(fromUpstream)) {
-            respondDoneToUpstream(fromUpstream, responsePlan);
+            respondExhaustedToUpstream(fromUpstream, responsePlan);
         } else {
             respondAnswersToUpstream(
                     fromUpstream,
@@ -148,11 +145,11 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void respondDoneToUpstream(final Request request, final Plan responsePlan) {
+    void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
         Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
-        Response.Done responseDone = new Response.Done(request, responsePlan);
-        LOG.debug("Responding Done to upstream in: " + name);
-        upstream.tell((actor) -> actor.receiveDone(responseDone));
+        Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
+        LOG.debug("Responding Exhausted to upstream in: " + name);
+        upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
     }
 
     private void initialiseResponseProducer(final Request request) {
@@ -200,11 +197,11 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).downstreamDone();
+        return !responseProducers.get(fromUpstream).downstreamExhausted();
     }
 
-    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
+    private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
     }
 
     private Long computeAnswer(final Response.Answer answer) {

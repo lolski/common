@@ -48,11 +48,11 @@ class ResponseProducer {
         return downstreamsAvailable.get(0);
     }
 
-    public boolean downstreamDone() {
+    public boolean downstreamExhausted() {
         return downstreamsAvailable.isEmpty();
     }
 
-    public void downstreamDone(final Request request) {
+    public void downstreamExhausted(final Request request) {
         downstreamsAvailable.remove(request);
     }
 
