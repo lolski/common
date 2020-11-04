@@ -146,30 +146,20 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     @Override
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
-        Request request = done.sourceRequest();
-        Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        responseProducer.requestsToDownstream--;
+        Request sentDownstream = done.sourceRequest();
+        Request fromUpstream = requestRouter.get(sentDownstream);
+        decrementRequestToDownstream(fromUpstream);
 
         // every conjunction has exactly 1 downstream, so a done message must indicate the downstream is done
-        responseProducer.downstreamDone(request);
-        Plan responsePlan = done.plan.endStepCompleted();
+        downstreamDone(fromUpstream, sentDownstream);
+        Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (responseProducer.finished()) {
-            respondDoneToUpstream(fromUpstream, responsePlan);
-        } else {
-            List<Long> answers = produceTraversalAnswers(responseProducer);
-            responseProducer.answers.addAll(answers);
-            respondAnswersToUpstream(
-                    fromUpstream,
-                    responsePlan,
-                    fromUpstream.partialAnswers,
-                    fromUpstream.constraints,
-                    fromUpstream.unifiers,
-                    responseProducer,
-                    responsePlan.currentStep()
-            );
-        }
+        if (noMoreAnswersPossible(fromUpstream))  respondDoneToUpstream(fromUpstream, responsePlan);
+        else traverseAndRespond(fromUpstream, responsePlan);
+    }
+
+    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
     }
 
     @Override

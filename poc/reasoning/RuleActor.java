@@ -125,15 +125,14 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     @Override
     public void receiveDone(final Response.Done done) {
         LOG.debug("Received done response in: " + name);
-        Request request = done.sourceRequest();
-        Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        responseProducer.requestsToDownstream--;
+        Request sentDownstream = done.sourceRequest();
+        Request fromUpstream = requestRouter.get(sentDownstream);
+        decrementRequestToDownstream(fromUpstream);
 
-        responseProducer.downstreamDone(request);
-        Plan responsePlan = done.plan.endStepCompleted();
+        downstreamDone(fromUpstream, sentDownstream);
+        Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (responseProducer.finished()) {
+        if (noMoreAnswersPossible(fromUpstream)) {
             respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             respondAnswersToUpstream(
@@ -142,10 +141,14 @@ public class RuleActor extends ReasoningActor<RuleActor> {
                     fromUpstream.partialAnswers,
                     fromUpstream.constraints,
                     fromUpstream.unifiers,
-                    responseProducer,
+                    responseProducers.get(fromUpstream),
                     responsePlan.currentStep()
             );
         }
+    }
+
+    private void downstreamDone(final Request fromUpstream, final Request sentDownstream) {
+        responseProducers.get(fromUpstream).downstreamDone(sentDownstream);
     }
 
     @Override
