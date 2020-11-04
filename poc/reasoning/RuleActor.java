@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -14,7 +13,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     Logger LOG;
 
     private final Actor<ConjunctiveActor> whenActor;
-    private final Map<Request, ResponseProducer> requestProducers;
+    private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
     private final String name;
 
@@ -26,34 +25,34 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         this.name = String.format("RuleActor(pattern:%s)", when);
         whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize, null));
         requestRouter = new HashMap<>();
-        requestProducers = new HashMap<>();
+        responseProducers = new HashMap<>();
     }
 
     @Override
-    public void receiveRequest(final Request request) {
-        LOG.debug("Received request in: " + name);
-        assert request.plan.atEnd() : "A rule that receives a request must be at the end of the plan";
+    public void receiveRequest(final Request fromUpstream) {
+        LOG.debug("Received fromUpstream in: " + name);
+        assert fromUpstream.plan.atEnd() : "A rule that receives a fromUpstream must be at the end of the plan";
 
-        if (!this.requestProducers.containsKey(request)) {
-            this.requestProducers.put(request, initialiseResponseProducer(request));
+        if (!this.responseProducers.containsKey(fromUpstream)) {
+            this.responseProducers.put(fromUpstream, initialiseResponseProducer(fromUpstream));
         }
 
-        ResponseProducer responseProducer = this.requestProducers.get(request);
-        Plan responsePlan = request.plan.endStepCompleted();
+        ResponseProducer responseProducer = this.responseProducers.get(fromUpstream);
+        Plan responsePlan = fromUpstream.plan.endStepCompleted();
 
         if (responseProducer.finished()) {
-            respondDoneToUpstream(request, responsePlan);
+            respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 respondAnswersToUpstream(
-                        request,
+                        fromUpstream,
                         responsePlan,
-                        request.partialAnswers,
-                        request.constraints,
-                        request.unifiers,
+                        fromUpstream.partialAnswers,
+                        fromUpstream.constraints,
+                        fromUpstream.unifiers,
                         responseProducer,
                         responsePlan.currentStep()
                 );
@@ -61,7 +60,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request, responseProducer);
+                    requestFromDownstream(fromUpstream);
                 }
             }
         }
@@ -72,7 +71,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
         Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         Long mergedAnswer = answer.partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
@@ -97,7 +96,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
         Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         responseProducer.downstreamDone(request);
@@ -119,11 +118,11 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
-        Request toDownstream = responseProducer.toDownstream();
+    void requestFromDownstream(final Request fromUpstream) {
+        Request toDownstream = responseProducers.get(fromUpstream).toDownstream();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(toDownstream, request);
+        requestRouter.put(toDownstream, fromUpstream);
 
         LOG.debug("Requesting from downstream in: " + name);
         whenActor.tell(actor -> actor.receiveRequest(toDownstream));

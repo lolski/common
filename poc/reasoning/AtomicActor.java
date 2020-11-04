@@ -17,7 +17,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     private final String name;
     private final Long traversalPattern;
     private final long traversalSize;
-    private final Map<Request, ResponseProducer> requestProducers;
+    private final Map<Request, ResponseProducer> responseProducers;
     // TODO EH???? what is the below comment
     // TODO note that this can be many to one, and is not catered for yet (ie. request followed the same request)
     private final Map<Request, Request> requestRouter;
@@ -30,7 +30,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         this.name = "AtomicActor(pattern: " + traversalPattern + ")";
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
-        requestProducers = new HashMap<>();
+        responseProducers = new HashMap<>();
         requestRouter = new HashMap<>();
         ruleActors = registerRuleActors(actorRegistry, rules);
     }
@@ -47,17 +47,17 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    public void receiveRequest(final Request request) {
-        LOG.debug("Received request in: " + name);
-        if (!this.requestProducers.containsKey(request)) {
-            this.requestProducers.put(request, initialiseResponseProducer(request));
+    public void receiveRequest(final Request fromUpstream) {
+        LOG.debug("Received fromUpstream in: " + name);
+        if (!this.responseProducers.containsKey(fromUpstream)) {
+            this.responseProducers.put(fromUpstream, initialiseResponseProducer(fromUpstream));
         }
 
-        ResponseProducer responseProducer = this.requestProducers.get(request);
+        ResponseProducer responseProducer = this.responseProducers.get(fromUpstream);
 
-        Plan responsePlan = request.plan.truncate().endStepCompleted();
+        Plan responsePlan = fromUpstream.plan.truncate().endStepCompleted();
         if (responseProducer.finished()) {
-            respondDoneToUpstream(request, responsePlan);
+            respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
@@ -66,11 +66,11 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
                 respondAnswersToUpstream(
-                        request,
+                        fromUpstream,
                         responsePlan,
-                        request.partialAnswers,
-                        request.constraints,
-                        request.unifiers,
+                        fromUpstream.partialAnswers,
+                        fromUpstream.constraints,
+                        fromUpstream.unifiers,
                         responseProducer,
                         responsePlan.currentStep()
                 );
@@ -78,7 +78,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request, responseProducer);
+                    requestFromDownstream(fromUpstream);
                 }
             }
         }
@@ -94,7 +94,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
         Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         List<Long> partialAnswers = answer.partialAnswers;
@@ -124,7 +124,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             );
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request, responseProducer);
+                    requestFromDownstream(fromUpstream);
                 }
             }
         } else if (request.plan.currentStep().state instanceof RuleActor) {
@@ -171,7 +171,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
         Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         responseProducer.downstreamDone(request);
@@ -194,19 +194,20 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(fromUpstream, responseProducer);
+                    requestFromDownstream(fromUpstream);
                 }
             }
         }
     }
 
     @Override
-    void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
+    void requestFromDownstream(final Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         Request toDownstream = responseProducer.toDownstream();
         Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
         responseProducer.requestsToDownstream++;
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(toDownstream, request);
+        requestRouter.put(toDownstream, fromUpstream);
 
         LOG.debug("Requesting from downstream in: " + name);
         downstream.tell(actor -> actor.receiveRequest(toDownstream));

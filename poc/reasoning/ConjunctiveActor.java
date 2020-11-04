@@ -23,7 +23,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     private final Long traversalSize;
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
-    private final Map<Request, ResponseProducer> requestProducers;
+    private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
 
@@ -37,24 +37,24 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         this.traversalSize = traversalSize;
         this.responses = responses;
         this.plannedAtomics = plan(actorRegistry, this.conjunction);
-        requestProducers = new HashMap<>();
+        responseProducers = new HashMap<>();
         requestRouter = new HashMap<>();
     }
 
     @Override
-    public void receiveRequest(final Request request) {
+    public void receiveRequest(final Request fromUpstream) {
         LOG.debug("Received request in: " + name);
-        assert request.plan.atEnd() : "A conjunction that receives a request must be at the end of the plan";
+        assert fromUpstream.plan.atEnd() : "A conjunction that receives a request must be at the end of the plan";
 
-        if (!this.requestProducers.containsKey(request)) {
-            this.requestProducers.put(request, initialiseResponseProducer(request));
+        if (!this.responseProducers.containsKey(fromUpstream)) {
+            this.responseProducers.put(fromUpstream, initialiseResponseProducer(fromUpstream));
         }
 
-        ResponseProducer responseProducer = this.requestProducers.get(request);
-        Plan responsePlan = request.plan.truncate().endStepCompleted();
+        ResponseProducer responseProducer = this.responseProducers.get(fromUpstream);
+        Plan responsePlan = fromUpstream.plan.truncate().endStepCompleted();
 
         if (responseProducer.finished()) {
-            respondDoneToUpstream(request, responsePlan);
+            respondDoneToUpstream(fromUpstream, responsePlan);
         } else {
             // TODO if we want batching, we increment by as many as are requested
             responseProducer.requestsFromUpstream++;
@@ -63,11 +63,11 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                 List<Long> answers = produceTraversalAnswers(responseProducer);
                 responseProducer.answers.addAll(answers);
                 respondAnswersToUpstream(
-                        request,
+                        fromUpstream,
                         responsePlan,
-                        request.partialAnswers,
-                        request.constraints,
-                        request.unifiers,
+                        fromUpstream.partialAnswers,
+                        fromUpstream.constraints,
+                        fromUpstream.unifiers,
                         responseProducer,
                         responsePlan.currentStep()
                 );
@@ -75,7 +75,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
             if (responseProducer.requestsFromUpstream > responseProducer.requestsToDownstream + responseProducer.answers.size()) {
                 if (!responseProducer.isDownstreamDone()) {
-                    requestFromDownstream(request, responseProducer);
+                    requestFromDownstream(fromUpstream);
                 }
             }
         }
@@ -86,7 +86,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         LOG.debug("Received answer response in: " + name);
         Request request = answer.request();
         Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         // directly pass answer response back after combining into a single answer
@@ -110,7 +110,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         LOG.debug("Received done response in: " + name);
         Request request = done.request();
         Request fromUpstream = requestRouter.get(request);
-        ResponseProducer responseProducer = requestProducers.get(fromUpstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.requestsToDownstream--;
 
         // every conjunction has exactly 1 downstream, so a done message must indicate the downstream is done
@@ -135,16 +135,17 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void requestFromDownstream(final Request request, final ResponseProducer responseProducer) {
+    void requestFromDownstream(final Request fromUpstream) {
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         Request toDownstream = responseProducer.toDownstream();
         Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(toDownstream, request);
+        requestRouter.put(toDownstream, fromUpstream);
 
         LOG.debug("Requesting from downstream in: " + name);
         downstream.tell(actor -> actor.receiveRequest(toDownstream));
-        requestProducers.get(request).requestsToDownstream++;
+        responseProducers.get(fromUpstream).requestsToDownstream++;
     }
 
     @Override
