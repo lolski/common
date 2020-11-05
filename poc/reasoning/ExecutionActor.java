@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -57,8 +56,8 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
         responseProducer.incrementRequestsFromUpstream();
         Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
-        if (action.isFirst()) handleRequest(action.first(), fromUpstream, responseProducer);
-        else handleResponse(action.second(), responseProducer);
+        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer);
+        else respondToUpstream(action.second(), responseProducer);
     }
 
     void executeReceiveAnswer(final Response.Answer fromDownstream) {
@@ -69,8 +68,8 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         responseProducer.decrementRequestsToDownstream();
         Either<Request, Response> action = receiveAnswer(fromUpstream, fromDownstream, responseProducer);
 
-        if (action.isFirst()) handleRequest(action.first(), fromUpstream, responseProducer);
-        else handleResponse(action.second(), responseProducer);
+        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer);
+        else respondToUpstream(action.second(), responseProducer);
     }
 
     void executeReceiveExhausted(final Response.Exhausted fromDownstream) {
@@ -82,12 +81,12 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
 
         Either<Request, Response> action = receiveExhausted(fromUpstream, fromDownstream, responseProducer);
 
-        if (action.isFirst()) handleRequest(action.first(), fromUpstream,  responseProducer);
-        else handleResponse(action.second(), responseProducer);
+        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream,  responseProducer);
+        else respondToUpstream(action.second(), responseProducer);
 
     }
 
-    private void handleRequest(Request request, Request fromUpstream, ResponseProducer responseProducer) {
+    private void requestFromDownstream(Request request, Request fromUpstream, ResponseProducer responseProducer) {
         LOG.debug("Requesting from downstream in: " + name);
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
@@ -96,17 +95,29 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         targetActor.tell(actor -> actor.executeReceiveRequest(request));
     }
 
-    private void handleResponse(Response response, ResponseProducer responseProducer) {
+    private void respondToUpstream(Response response, ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
-        if (response.isAnswer()) {
-            LOG.debug("Responding answer to upstream from actor: " + name);
-            targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
-        } else if (response.isExhausted()) {
-            LOG.debug("Responding Exhausted to upstream from actor: " + name);
-            targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
+        if (targetActor == null) {
+            assert responses != null : this + ": can't return answers because the user answers queue is null";
+            if (response.isAnswer()) {
+                Long mergedAnswer = response.asAnswer().partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
+                LOG.debug("Writing Answer to output queue in: " + name);
+                responses.add(mergedAnswer);
+            } else {
+                LOG.debug("Writing Exhausted to output queue in: " + name);
+                responses.add(-1L);
+            }
         } else {
-            throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
+            if (response.isAnswer()) {
+                LOG.debug("Responding answer to upstream from actor: " + name);
+                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
+            } else if (response.isExhausted()) {
+                LOG.debug("Responding Exhausted to upstream from actor: " + name);
+                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
+            } else {
+                throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
+            }
+            responseProducer.decrementRequestsFromUpstream();
         }
-        responseProducer.decrementRequestsFromUpstream();
     }
 }
