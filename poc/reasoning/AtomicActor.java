@@ -9,10 +9,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-public class AtomicActor extends ReasoningActor<AtomicActor> {
-    private final Logger LOG;
+public class AtomicActor extends ExecutionActor<AtomicActor> {
 
-    private final String name;
     private final Long traversalPattern;
     private final long traversalSize;
     // TODO EH???? what is the below comment
@@ -20,10 +18,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     private final List<Actor<RuleActor>> ruleActors;
 
     public AtomicActor(final Actor<AtomicActor> self, final ActorRegistry actorRegistry, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
-        super(self, actorRegistry);
-        LOG = LoggerFactory.getLogger(AtomicActor.class.getSimpleName() + "-" + traversalPattern);
-
-        name = "AtomicActor(pattern: " + traversalPattern + ")";
+        super(self, actorRegistry, "AtomicActor(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
         ruleActors = registerRuleActors(actorRegistry, rules);
@@ -42,9 +37,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     @Override
     public void receiveRequest(final Request fromUpstream) {
-        LOG.debug("Received fromUpstream in: " + name);
 
-        initialiseResponseProducer(fromUpstream);
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
@@ -75,7 +68,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         // TODO fix accessing state
         if (answerSource(fromDownstream).state instanceof AtomicActor) {
-            registerTraversal(fromUpstream, fromDownstream.partialAnswers);
+            registerTraversal(responseProducers.get(fromUpstream), fromDownstream.partialAnswers);
             traverseAndRespond(fromUpstream, forwardingPlan);
             registerDownstreamRules(
                     fromUpstream,
@@ -132,7 +125,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     void requestFromAvailableDownstream(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         Request toDownstream = responseProducer.getAvailableDownstream();
-        Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
+        Actor<? extends ExecutionActor<?>> downstream = toDownstream.plan.currentStep();
         responseProducer.incrementRequestsToDownstream();
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(toDownstream, fromUpstream);
@@ -149,7 +142,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             final List<Object> constraints,
             final List<Object> unifiers,
             final ResponseProducer responseProducer,
-            final Actor<? extends ReasoningActor<?>> upstream
+            final Actor<? extends ExecutionActor<?>> upstream
     ) {
         Response.Answer responseAnswer = new Response.Answer(
                 request,
@@ -167,38 +160,37 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     @Override
     void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
-        Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
+        Actor<? extends ExecutionActor<?>> upstream = responsePlan.currentStep();
         Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
         LOG.debug("Responding Exhausted to upstream from actor: " + name);
         upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
     }
 
-    private void initialiseResponseProducer(final Request request) {
-        if (!responseProducers.containsKey(request)) {
-            ResponseProducer responseProducer = new ResponseProducer();
-            responseProducers.put(request, responseProducer);
+    @Override
+    ResponseProducer createResponseProducer(final Request request) {
+        ResponseProducer responseProducer = new ResponseProducer();
 
-            boolean hasDownstream = request.plan.nextStep() != null;
-            if (hasDownstream) {
-                Plan nextStep = request.plan.toNextStep();
-                Request toDownstream = new Request(
-                        nextStep,
-                        request.partialAnswers,
-                        request.constraints,
-                        request.unifiers
-                );
-                responseProducer.addAvailableDownstream(toDownstream);
-            } else {
-                registerTraversal(request, request.partialAnswers);
-                registerDownstreamRules(
-                        request,
-                        request.plan,
-                        request.partialAnswers,
-                        request.constraints,
-                        request.unifiers
-                );
-            }
+        boolean hasDownstream = request.plan().nextStep() != null;
+        if (hasDownstream) {
+            Plan nextStep = request.plan().toNextStep();
+            Request toDownstream = new Request(
+                    nextStep,
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
+            responseProducer.addAvailableDownstream(toDownstream);
+        } else {
+            registerTraversal(responseProducer, request.partialAnswers);
+            registerDownstreamRules(
+                    request,
+                    request.plan(),
+                    request.partialAnswers,
+                    request.constraints,
+                    request.unifiers
+            );
         }
+        return responseProducer;
     }
 
     private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
@@ -226,10 +218,10 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         return Arrays.asList(answer);
     }
 
-    private void registerTraversal(final Request request, final List<Long> partialAnswer) {
+    private void registerTraversal(ResponseProducer responseProducer, final List<Long> partialAnswer) {
         Long mergedAnswer = partialAnswer.stream().reduce(0L, (acc, v) -> acc + v);
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(mergedAnswer);
-        if (traversal.hasNext()) responseProducers.get(request).addTraversalProducer(traversal);
+        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
     }
 
     private void registerDownstreamRules(final Request request, final Plan basePlan, final List<Long> partialAnswers,
@@ -258,7 +250,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
         responseProducers.get(fromUpstream).decrementRequestsToDownstream();
     }
 
-    private Actor<? extends ReasoningActor<?>> answerSource(final Response.Answer answer) {
+    private Actor<? extends ExecutionActor<?>> answerSource(final Response.Answer answer) {
         return answer.sourceRequest().plan.currentStep();
     }
 

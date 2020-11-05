@@ -6,7 +6,7 @@ import java.util.Objects;
 
 // TODO make immutable, so we can cache hashes
 public class Request {
-    final Plan plan;
+    private final Plan plan;
     final List<Long> partialAnswers;
     final List<Object> constraints;
     final List<Object> unifiers;
@@ -36,4 +36,6 @@ public class Request {
     public int hashCode() {
         return Objects.hash(plan, partialAnswers, constraints, unifiers);
     }
+
+    public Plan plan() { return plan; }
 }

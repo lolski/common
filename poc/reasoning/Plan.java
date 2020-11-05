@@ -13,10 +13,10 @@ import java.util.Objects;
 public class Plan {
     private static final int NOT_STARTED = -1;
 
-    List<Actor<? extends ReasoningActor<?>>> plan;
+    List<Actor<? extends ExecutionActor<?>>> plan;
     int current = NOT_STARTED;
 
-    public Plan(List<Actor<? extends ReasoningActor<?>>> plan) {
+    public Plan(List<Actor<? extends ExecutionActor<?>>> plan) {
         this.plan = new ArrayList<>(plan);
     }
 
@@ -57,12 +57,12 @@ public class Plan {
         return plan;
     }
 
-    public Plan addStep(final Actor<? extends ReasoningActor<?>> actor) {
+    public Plan addStep(final Actor<? extends ExecutionActor<?>> actor) {
         assert current == plan.size() - 1 : "Can only add a step if at the last step of the plan";
         return addSteps(Arrays.asList(actor));
     }
 
-    public Plan addSteps(final List<? extends Actor<? extends ReasoningActor<?>>> actors) {
+    public Plan addSteps(final List<? extends Actor<? extends ExecutionActor<?>>> actors) {
         assert current == plan.size() - 1 : "Can only add a step if at the last step of the plan";
 
         Plan plan = new Plan(this.plan);
@@ -72,19 +72,19 @@ public class Plan {
     }
 
     @Nullable
-    public Actor<? extends ReasoningActor<?>> previousStep() {
+    public Actor<? extends ExecutionActor<?>> previousStep() {
         if (current == 0) return null;
         return plan.get(current - 1);
     }
 
     @Nullable
-    public Actor<? extends ReasoningActor<?>> currentStep() {
+    public Actor<? extends ExecutionActor<?>> currentStep() {
         if (current == NOT_STARTED) return null;
         return plan.get(current);
     }
 
     @Nullable
-    public Actor<? extends ReasoningActor<?>> nextStep() {
+    public Actor<? extends ExecutionActor<?>> nextStep() {
         if (current == plan.size() - 1) return null;
         return plan.get(current + 1);
     }

@@ -14,7 +14,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.list;
 
-public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
+public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     private final Logger LOG;
 
     private final String name;
@@ -100,7 +100,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     void requestFromAvailableDownstream(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         Request toDownstream = responseProducer.getAvailableDownstream();
-        Actor<? extends ReasoningActor<?>> downstream = toDownstream.plan.currentStep();
+        Actor<? extends ExecutionActor<?>> downstream = toDownstream.plan.currentStep();
 
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(toDownstream, fromUpstream);
@@ -117,7 +117,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
                                  final List<Object> constraints,
                                  final List<Object> unifiers,
                                  final ResponseProducer responseProducer,
-                                 @Nullable final Actor<? extends ReasoningActor<?>> upstream) {
+                                 @Nullable final Actor<? extends ExecutionActor<?>> upstream) {
         // send as many answers as possible to upstream
         if (upstream == null) {
             // base case - how to return from Actor model
@@ -148,7 +148,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
             LOG.debug("Writing Exhausted to output queue in: " + name);
             responses.add(-1L);
         } else {
-            Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
+            Actor<? extends ExecutionActor<?>> upstream = responsePlan.currentStep();
             Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
             LOG.debug("Responding Exhausted to upstream in: " + name);
             upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));

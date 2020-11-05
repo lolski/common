@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-public class RuleActor extends ReasoningActor<RuleActor> {
+public class RuleActor extends ExecutionActor<RuleActor> {
     private final Logger LOG;
 
     private final String name;
@@ -95,7 +95,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             final List<Object> constraints,
             final List<Object> unifiers,
             final ResponseProducer responseProducer,
-            final Actor<? extends ReasoningActor<?>> upstream
+            final Actor<? extends ExecutionActor<?>> upstream
     ) {
         Response.Answer responseAnswer = new Response.Answer(
                 request,
@@ -112,7 +112,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
     @Override
     void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
-        Actor<? extends ReasoningActor<?>> upstream = responsePlan.currentStep();
+        Actor<? extends ExecutionActor<?>> upstream = responsePlan.currentStep();
         Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
         LOG.debug("Responding Exhausted to upstream in: " + name);
         upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
