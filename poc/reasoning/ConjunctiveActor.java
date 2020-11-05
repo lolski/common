@@ -84,12 +84,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         ResponseProducer responseProducer = new ResponseProducer();
 
         Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
-        Request toDownstream = new Request(
-                nextPlan,
-                request.partialAnswers,
-                request.constraints,
-                request.unifiers
-        );
+        Request toDownstream = new Request(nextPlan, request.partialAnswers, request.constraints, request.unifiers);
         responseProducer.addAvailableDownstream(toDownstream);
 
         Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();

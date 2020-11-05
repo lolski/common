@@ -31,10 +31,6 @@ class ResponseProducer {
         return null;
     }
 
-    public boolean noMoreAnswersPossible() {
-        return downstreamsAvailable.isEmpty() && traversalProducers.isEmpty();
-    }
-
     public void addAvailableDownstream(final Request toDownstream) {
         downstreamsAvailable.add(toDownstream);
     }
@@ -51,20 +47,12 @@ class ResponseProducer {
         downstreamsAvailable.remove(request);
     }
 
-    public int requestsFromUpstream() {
-        return requestsFromUpstream;
-    }
-
     public void incrementRequestsFromUpstream() {
         requestsFromUpstream++;
     }
 
     public void decrementRequestsFromUpstream() {
         requestsFromUpstream--;
-    }
-
-    public int requestsToDownstream() {
-        return requestsToDownstream;
     }
 
     public void incrementRequestsToDownstream() {

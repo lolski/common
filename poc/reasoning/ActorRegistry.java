@@ -10,7 +10,6 @@ public class ActorRegistry {
     private ConcurrentHashMap<Long, Actor<AtomicActor>> atomicActors;
     private ConcurrentHashMap<List<Long>, Actor<RuleActor>> ruleActors;
 
-
     public ActorRegistry() {
         this.atomicActors = new ConcurrentHashMap<>();
         this.ruleActors = new ConcurrentHashMap<>();
