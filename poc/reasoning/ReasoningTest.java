@@ -6,7 +6,9 @@ import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static junit.framework.TestCase.assertEquals;
@@ -332,5 +334,25 @@ public class ReasoningTest {
         assertEquals(responses.take().longValue(), -1L);
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
+    }
+
+    @Test
+    public void bulkActorCreation() {
+        ActorRegistry actorRegistry = new ActorRegistry();
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
+
+        List<List<Long>> rules = new ArrayList<>();
+        for (long i = 2L; i < 217; i++) {
+            rules.add(Arrays.asList(i));
+        }
+        long start = System.currentTimeMillis();
+        actorRegistry.registerAtomic(1L, pattern ->
+                rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, rules))).awaitUnchecked()
+        );
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor -> actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
+        long elapsed = System.currentTimeMillis() - start;
+        System.out.println("elapsed = " + elapsed);
     }
 }

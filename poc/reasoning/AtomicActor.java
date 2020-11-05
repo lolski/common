@@ -24,6 +24,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
         final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
         for (List<Long> rule : rules) {
+            System.out.println("rule: " + rule.get(0));
             Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
                     child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L))
             );
