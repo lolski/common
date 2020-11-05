@@ -21,7 +21,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
         assert fromUpstream.plan().atEnd() : "A rule that receives a fromUpstream must be at the end of the plan";
 
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
 
         if (!responseProducer.downstreamsExhausted()) {
             return Either.first(responseProducer.getAvailableDownstream());
@@ -45,7 +45,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
         return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
     }
 
@@ -65,7 +65,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
         return responseProducer;
     }
 
-    private Plan getResponsePlan(final Request fromUpstream) {
+    private Plan respondingPlan(final Request fromUpstream) {
         return fromUpstream.plan().endStepCompleted();
     }
 

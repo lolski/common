@@ -22,19 +22,9 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
         this.rules = rules;
     }
 
-    private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
-        final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
-        for (List<Long> rule : rules) {
-            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
-                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L)));
-            ruleActors.add(ruleActor);
-        }
-        return ruleActors;
-    }
-
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
 
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
@@ -80,7 +70,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answer = produceTraversalAnswer(responseProducer);
             return Either.second(
@@ -134,11 +124,21 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
         }
     }
 
+    private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
+        final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
+        for (List<Long> rule : rules) {
+            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
+                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L)));
+            ruleActors.add(ruleActor);
+        }
+        return ruleActors;
+    }
+
     private Actor<? extends ExecutionActor<?>> answerSource(final Response.Answer answer) {
         return answer.sourceRequest().plan().currentStep();
     }
 
-    private Plan getResponsePlan(final Request fromUpstream) {
+    private Plan respondingPlan(final Request fromUpstream) {
         return fromUpstream.plan().truncate().endStepCompleted();
     }
 

@@ -19,19 +19,14 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     private final List<Long> conjunction;
     private List<Actor<AtomicActor>> plannedAtomics = null;
 
-
-    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
-                               final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
-        super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
-
-        this.conjunction = conjunction;
-        this.traversalSize = traversalSize;
+    ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
+                               final Long traversalSize) {
+        this(self, actorRegistry, conjunction, traversalSize, null);
     }
 
-
-    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
-                               final Long traversalSize) {
-        super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")");
+    ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
+                               final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
+        super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
@@ -41,7 +36,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
         assert fromUpstream.plan().atEnd() : "A conjunction that receives a request must be at the end of the plan";
 
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
 
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
@@ -66,7 +61,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         // every conjunction has exactly 1 downstream, so an exhausted message must indicate the downstream is exhausted
         responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
 
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
@@ -117,7 +112,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         return Arrays.asList(answer);
     }
 
-    private Plan getResponsePlan(final Request fromUpstream) {
+    private Plan respondingPlan(final Request fromUpstream) {
         return fromUpstream.plan().endStepCompleted();
     }
 
