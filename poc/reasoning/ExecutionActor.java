@@ -8,14 +8,26 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T>{
     final Logger LOG;
     String name;
 
+    private final LinkedBlockingQueue<Long> responses;
     private final ActorRegistry actorRegistry;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
+
+    protected ExecutionActor(final Actor<T> self, final ActorRegistry actorRegistry, final String name, LinkedBlockingQueue<Long> responses) {
+        super(self);
+        LOG = LoggerFactory.getLogger(name);
+        this.actorRegistry = actorRegistry;
+        this.name = name;
+        responseProducers = new HashMap<>();
+        requestRouter = new HashMap<>();
+        this.responses = responses;
+    }
 
     protected ExecutionActor(final Actor<T> self, final ActorRegistry actorRegistry, final String name) {
         super(self);
@@ -24,7 +36,9 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         this.name = name;
         responseProducers = new HashMap<>();
         requestRouter = new HashMap<>();
+        this.responses = null;
     }
+
 
     abstract ResponseProducer createResponseProducer(final Request fromUpstream);
 
@@ -43,28 +57,8 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
         responseProducer.incrementRequestsFromUpstream();
         Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
-        if (action.isFirst()) {
-            LOG.debug("Requesting from downstream in: " + name);
-            Request request = action.first();
-            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-            requestRouter.put(request, fromUpstream);
-            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
-            responseProducer.incrementRequestsToDownstream();
-            targetActor.tell(actor -> actor.executeReceiveRequest(request));
-        } else {
-            Response response = action.second();
-            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
-            if (response.isAnswer()) {
-                LOG.debug("Responding answer to upstream from actor: " + name);
-                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
-            } else if (response.isExhausted()) {
-                LOG.debug("Responding Exhausted to upstream from actor: " + name);
-                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
-            } else {
-                throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
-            }
-            responseProducer.decrementRequestsFromUpstream();
-        }
+        if (action.isFirst()) handleRequest(action.first(), fromUpstream, responseProducer);
+        else handleResponse(action.second(), responseProducer);
     }
 
     void executeReceiveAnswer(final Response.Answer fromDownstream) {
@@ -73,22 +67,10 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         Request fromUpstream = requestRouter.get(sentDownstream);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.decrementRequestsToDownstream();
-        Either<Request, Response> action = receiveAnswer(fromUpstream, fromDownstream ,responseProducer);
-        if (action.isFirst()) {
-            LOG.debug("Requesting from downstream in: " + name);
-            Request request = action.first();
-            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-            requestRouter.put(request, fromUpstream);
-            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
-            responseProducer.incrementRequestsToDownstream();
-            targetActor.tell(actor -> actor.executeReceiveRequest(request));
-        } else {
-            Response response = action.second();
-            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
-            LOG.debug("Responding answer to upstream from actor: " + name);
-            responseProducer.decrementRequestsFromUpstream();
-            targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
-        }
+        Either<Request, Response> action = receiveAnswer(fromUpstream, fromDownstream, responseProducer);
+
+        if (action.isFirst()) handleRequest(action.first(), fromUpstream, responseProducer);
+        else handleResponse(action.second(), responseProducer);
     }
 
     void executeReceiveExhausted(final Response.Exhausted fromDownstream) {
@@ -99,29 +81,32 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         responseProducer.decrementRequestsToDownstream();
 
         Either<Request, Response> action = receiveExhausted(fromUpstream, fromDownstream, responseProducer);
-        if (action == null) return;
 
-        if (action.isFirst()) {
-            LOG.debug("Requesting from downstream in: " + name);
-            Request request = action.first();
-            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-            requestRouter.put(request, fromUpstream);
-            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
-            responseProducer.incrementRequestsToDownstream();
-            targetActor.tell(actor -> actor.executeReceiveRequest(request));
+        if (action.isFirst()) handleRequest(action.first(), fromUpstream,  responseProducer);
+        else handleResponse(action.second(), responseProducer);
+
+    }
+
+    private void handleRequest(Request request, Request fromUpstream, ResponseProducer responseProducer) {
+        LOG.debug("Requesting from downstream in: " + name);
+        // TODO we may overwrite if multiple identical requests are sent, when to clean up?
+        requestRouter.put(request, fromUpstream);
+        Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
+        responseProducer.incrementRequestsToDownstream();
+        targetActor.tell(actor -> actor.executeReceiveRequest(request));
+    }
+
+    private void handleResponse(Response response, ResponseProducer responseProducer) {
+        Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
+        if (response.isAnswer()) {
+            LOG.debug("Responding answer to upstream from actor: " + name);
+            targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
+        } else if (response.isExhausted()) {
+            LOG.debug("Responding Exhausted to upstream from actor: " + name);
+            targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
         } else {
-            Response response = action.second();
-            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
-            if (response.isAnswer()) {
-                LOG.debug("Responding answer to upstream from actor: " + name);
-                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
-            } else if (response.isExhausted()) {
-                LOG.debug("Responding Exhausted to upstream from actor: " + name);
-                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
-            } else {
-                throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
-            }
-            responseProducer.decrementRequestsFromUpstream();
+            throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
         }
+        responseProducer.decrementRequestsFromUpstream();
     }
 }

@@ -16,18 +16,26 @@ import static grakn.common.collection.Collections.list;
 public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     private final Long traversalSize;
     @Nullable
-    private final LinkedBlockingQueue<Long> responses;
     private final List<Long> conjunction;
     private final List<Actor<AtomicActor>> plannedAtomics;
 
 
     protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
                                final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
+        super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
+
+        this.conjunction = conjunction;
+        this.traversalSize = traversalSize;
+        this.plannedAtomics = plan(actorRegistry, this.conjunction);
+    }
+
+
+    protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
+                               final Long traversalSize) {
         super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")");
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
-        this.responses = responses;
         this.plannedAtomics = plan(actorRegistry, this.conjunction);
     }
 
@@ -67,15 +75,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
             return Either.second(
                     new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
         } else {
-            if (responsePlan.currentStep() == null) {
-                // base case - how to return from Actor model
-                assert responses != null : this + ": can't return answers because the user answers queue is null";
-                LOG.debug("Writing Exhausted to output queue in: " + name);
-                responses.add(-1L);
-                return null;
-            } else {
-                return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
-            }
+            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
         }
     }
 

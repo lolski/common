@@ -11,7 +11,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
     public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
                      final Long whenTraversalSize) {
         super(self, actorRegistry, RuleActor.class.getSimpleName() + "(pattern:" + when + ")");
-        whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize, null));
+        whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize));
     }
 
     @Override
