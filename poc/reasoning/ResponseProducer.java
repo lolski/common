@@ -43,7 +43,7 @@ class ResponseProducer {
         return downstreamsAvailable.get(0);
     }
 
-    public boolean downstreamExhausted() {
+    public boolean downstreamsExhausted() {
         return downstreamsAvailable.isEmpty();
     }
 

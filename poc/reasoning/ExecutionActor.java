@@ -30,9 +30,9 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
 
     abstract Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer);
 
-    abstract Either<Request, Response.Answer> receiveAnswer(final Response.Answer fromDownstream);
+    abstract Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer);
 
-    abstract Either<Request, Response> receiveExhausted(final Response.Exhausted fromDownstream);
+    abstract Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer);
 
     /*
     Handlers for messages sent into the execution actor that are dispatched via the actor model
@@ -73,7 +73,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         Request fromUpstream = requestRouter.get(sentDownstream);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.decrementRequestsToDownstream();
-        Either<Request, Response.Answer> action = receiveAnswer(fromDownstream);
+        Either<Request, Response> action = receiveAnswer(fromUpstream, fromDownstream ,responseProducer);
         if (action.isFirst()) {
             LOG.debug("Requesting from downstream in: " + name);
             Request request = action.first();
@@ -98,7 +98,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
         responseProducer.decrementRequestsToDownstream();
 
-        Either<Request, Response> action = receiveExhausted(fromDownstream);
+        Either<Request, Response> action = receiveExhausted(fromUpstream, fromDownstream, responseProducer);
         if (action.isFirst()) {
             LOG.debug("Requesting from downstream in: " + name);
             Request request = action.first();
@@ -122,16 +122,4 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
             responseProducer.decrementRequestsFromUpstream();
         }
     }
-
-    abstract void requestFromAvailableDownstream(final Request request);
-
-    abstract void respondAnswerToUpstream(final Request request,
-                                          final Plan plan,
-                                          final List<Long> partialAnswers, // TODO: this should be a Map<Variable, Long> (every variable has one answer)
-                                          final List<Object> constraints,
-                                          final List<Object> unifiers,
-                                          final ResponseProducer responseProducer,
-                                          final Actor<? extends ExecutionActor<?>> upstream);
-
-    abstract void respondExhaustedToUpstream(final Request request, final Plan responsePlan);
 }

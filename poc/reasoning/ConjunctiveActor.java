@@ -241,7 +241,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     }
 
     private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).downstreamExhausted();
+        return !responseProducers.get(fromUpstream).downstreamsExhausted();
     }
 
     private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
