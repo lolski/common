@@ -23,27 +23,12 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     }
 
     private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
-        long everythingElseStart = System.nanoTime();
-        long[] childElapsed = new long[] {0};
-        long[] ruleElapsed = new long[] {0};
         final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
         for (List<Long> rule : rules) {
-            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern -> {
-                long childStart = System.nanoTime();
-                Actor<RuleActor> child = child(actor -> {
-                    long ruleStart = System.nanoTime();
-                    RuleActor ruleActor1 = new RuleActor(actor, actorRegistry, pattern, 1L);
-                    ruleElapsed[0] += System.nanoTime() - ruleStart;
-                    return ruleActor1;
-                });
-                childElapsed[0] += System.nanoTime() - childStart;
-                return child;
-            });
+            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
+                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L)));
             ruleActors.add(ruleActor);
         }
-        System.out.println("elapsed (rule) = " + (ruleElapsed[0])/ 1000000.0 + "ms");
-        System.out.println("elapsed (child + rule) = " + childElapsed[0] / 1000000.0 + "ms");
-        System.out.println("elapsed (everything else) = " + (System.nanoTime() - everythingElseStart - childElapsed[0])/ 1000000.0 + "ms");
         return ruleActors;
     }
 
