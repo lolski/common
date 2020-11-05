@@ -1,8 +1,7 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,22 +35,26 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     }
 
     @Override
-    public void receiveRequest(final Request fromUpstream) {
-
-
+    public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
+        if (noMoreAnswersPossible(fromUpstream)) {
+            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
+        }
         else {
-            // TODO if we want batching, we increment by as many as are requested
-            incrementRequestsFromUpstream(fromUpstream);
-
-            if (upstreamHasRequestsOutstanding(fromUpstream)) {
-                traverseAndRespond(fromUpstream, responsePlan);
-            }
-
-            if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
-                requestFromAvailableDownstream(fromUpstream);
+            if (responseProducer.getOneTraversalProducer() != null) {
+                List<Long> answers = produceTraversalAnswers(responseProducer);
+                return Either.second(
+                        new Response.Answer(
+                                fromUpstream,
+                                responsePlan,
+                                answers,
+                                fromUpstream.constraints,
+                                fromUpstream.unifiers
+                        )
+                );
+            } else {
+                return Either.first(responseProducer.getAvailableDownstream());
             }
         }
     }

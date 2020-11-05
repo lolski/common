@@ -28,7 +28,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
 
     abstract ResponseProducer createResponseProducer(final Request fromUpstream);
 
-    abstract Either<Request, Response> receiveRequest(final Request fromUpstream);
+    abstract Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer);
 
     abstract Either<Request, Response.Answer> receiveAnswer(final Response.Answer fromDownstream);
 
@@ -42,7 +42,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
 
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
         responseProducer.incrementRequestsFromUpstream();
-        Either<Request, Response> action = receiveRequest(fromUpstream);
+        Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
         if (action.isFirst()) {
             LOG.debug("Requesting from downstream in: " + name);
             Request request = action.first();
