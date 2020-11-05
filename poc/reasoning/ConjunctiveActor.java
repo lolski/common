@@ -68,13 +68,9 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         Request fromUpstream = requestRouter.get(sentDownstream);
 
         decrementRequestToDownstream(fromUpstream);
-
-        // directly pass answer response back after combining into a single answer
-        Long mergedAnswers = computeAnswer(fromDownstream.partialAnswers);
-        bufferAnswer(fromUpstream, mergedAnswers);
-
         Plan forwardingPlan = forwardingPlan(fromDownstream);
-        respondAnswersToUpstream(
+
+        respondAnswerToUpstream(
                 fromUpstream,
                 forwardingPlan,
                 fromUpstream.partialAnswers,
@@ -96,7 +92,7 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         downstreamExhausted(fromUpstream, sentDownstream);
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream))  respondExhaustedToUpstream(fromUpstream, responsePlan);
+        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
         else traverseAndRespond(fromUpstream, responsePlan);
     }
 
@@ -115,36 +111,33 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(final Request request,
-                                  final Plan plan,
-                                  final List<Long> partialAnswers,
-                                  final List<Object> constraints,
-                                  final List<Object> unifiers,
-                                  final ResponseProducer responseProducer,
-                                  @Nullable final Actor<? extends ReasoningActor<?>> upstream) {
+    void respondAnswerToUpstream(final Request request,
+                                 final Plan plan,
+                                 final List<Long> partialAnswer,
+                                 final List<Object> constraints,
+                                 final List<Object> unifiers,
+                                 final ResponseProducer responseProducer,
+                                 @Nullable final Actor<? extends ReasoningActor<?>> upstream) {
         // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream(), responseProducer.bufferedSize()); i++) {
-            Long answer = responseProducer.bufferTake();
-            if (upstream == null) {
-                // base case - how to return from Actor model
-                assert responses != null : this + ": can't return answers because the user answers queue is null";
-                LOG.debug("Saving answer to output queue in: " + name);
-                responses.add(answer);
-            } else {
-                List<Long> newAnswers = list(partialAnswers, answer);
-                Response.Answer responseAnswer = new Response.Answer(
-                        request,
-                        plan,
-                        newAnswers,
-                        constraints,
-                        unifiers
-                );
+        if (upstream == null) {
+            // base case - how to return from Actor model
+            assert responses != null : this + ": can't return answers because the user answers queue is null";
+            LOG.debug("Saving answer to output queue in: " + name);
+            Long merged = partialAnswer.stream().reduce(0L, (acc, v) -> acc + v);
+            responses.add(merged);
+        } else {
+            Response.Answer responseAnswer = new Response.Answer(
+                    request,
+                    plan,
+                    partialAnswer,
+                    constraints,
+                    unifiers
+            );
 
-                LOG.debug("Responding answer to upstream from actor: " + name);
-                upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
-            }
-            responseProducer.decrementRequestsFromUpstream();
+            LOG.debug("Responding answer to upstream from actor: " + name);
+            upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
         }
+        responseProducer.decrementRequestsFromUpstream();
     }
 
     @Override
@@ -200,37 +193,31 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
 
     private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        List<Long> answers = produceTraversalAnswers(responseProducer);
-        responseProducer.bufferAnswers(answers);
-        respondAnswersToUpstream(
-                fromUpstream,
-                responsePlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducer,
-                responsePlan.currentStep()
-        );
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswers(responseProducer);
+            respondAnswerToUpstream(
+                    fromUpstream,
+                    responsePlan,
+                    answers,
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
+        }
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
         Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        if (traversalProducer != null) {
-            // TODO could do batch traverse, or retrieve answers from multiple traversals
-            Long answer = traversalProducer.next();
-            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-            return Arrays.asList(answer);
-        }
-        return Arrays.asList();
-    }
-
-    private void bufferAnswer(final Request fromUpstream, final Long mergedAnswers) {
-        responseProducers.get(fromUpstream).bufferAnswer(mergedAnswers);
+        // TODO could do batch traverse, or retrieve answers from multiple traversals
+        Long answer = traversalProducer.next();
+        if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
+        return Arrays.asList(answer);
     }
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream() + responseProducer.bufferedSize();
+        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
@@ -261,7 +248,4 @@ public class ConjunctiveActor extends ReasoningActor<ConjunctiveActor> {
         responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
     }
 
-    private Long computeAnswer(final List<Long> partialAnswers) {
-        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
-    }
 }

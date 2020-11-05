@@ -26,13 +26,13 @@ public abstract class ReasoningActor<T extends ReasoningActor<T>> extends Actor.
 
     abstract void requestFromAvailableDownstream(final Request request);
 
-    abstract void respondAnswersToUpstream(final Request request,
-                                           final Plan plan,
-                                           final List<Long> partialAnswers, // TODO: this should be a Map<Variable, Long> (every variable has one answer)
-                                           final List<Object> constraints,
-                                           final List<Object> unifiers,
-                                           final ResponseProducer responseProducer,
-                                           final Actor<? extends ReasoningActor<?>> upstream);
+    abstract void respondAnswerToUpstream(final Request request,
+                                          final Plan plan,
+                                          final List<Long> partialAnswers, // TODO: this should be a Map<Variable, Long> (every variable has one answer)
+                                          final List<Object> constraints,
+                                          final List<Object> unifiers,
+                                          final ResponseProducer responseProducer,
+                                          final Actor<? extends ReasoningActor<?>> upstream);
 
     abstract void respondExhaustedToUpstream(final Request request, final Plan responsePlan);
 

@@ -4,7 +4,6 @@ import grakn.common.concurrent.actor.Actor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class RuleActor extends ReasoningActor<RuleActor> {
@@ -36,18 +35,6 @@ public class RuleActor extends ReasoningActor<RuleActor> {
             // TODO if we want batching, we increment by as many as are requested
             incrementRequestsFromUpstream(fromUpstream);
 
-            if (upstreamHasRequestsOutstanding(fromUpstream)) {
-                respondAnswersToUpstream(
-                        fromUpstream,
-                        responsePlan,
-                        fromUpstream.partialAnswers,
-                        fromUpstream.constraints,
-                        fromUpstream.unifiers,
-                        responseProducers.get(fromUpstream),
-                        responsePlan.currentStep()
-                );
-            }
-
             if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
                 requestFromAvailableDownstream(fromUpstream);
             }
@@ -61,12 +48,9 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         Request fromUpstream = requestRouter.get(sentDownstream);
 
         decrementRequestToDownstream(fromUpstream);
-
-        Long mergedAnswer = computeAnswer(fromDownstream);
-        bufferAnswer(fromUpstream, mergedAnswer);
-
         Plan forwardingPlan = forwardingPlan(fromDownstream);
-        respondAnswersToUpstream(
+
+        respondAnswerToUpstream(
                 fromUpstream,
                 forwardingPlan,
                 fromUpstream.partialAnswers,
@@ -89,19 +73,7 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         downstreamExhausted(fromUpstream, sentDownstream);
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) {
-            respondExhaustedToUpstream(fromUpstream, responsePlan);
-        } else {
-            respondAnswersToUpstream(
-                    fromUpstream,
-                    responsePlan,
-                    fromUpstream.partialAnswers,
-                    fromUpstream.constraints,
-                    fromUpstream.unifiers,
-                    responseProducers.get(fromUpstream),
-                    responsePlan.currentStep()
-            );
-        }
+        if (noMoreAnswersPossible(fromUpstream))  respondExhaustedToUpstream(fromUpstream, responsePlan);
     }
 
     @Override
@@ -116,33 +88,27 @@ public class RuleActor extends ReasoningActor<RuleActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(
+    void respondAnswerToUpstream(
             final Request request,
             final Plan plan,
-            final List<Long> partialAnswers,
+            final List<Long> partialAnswer,
             final List<Object> constraints,
             final List<Object> unifiers,
             final ResponseProducer responseProducer,
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
-        // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream(), responseProducer.bufferedSize()); i++) {
-            Long answer = responseProducer.bufferTake();
-            List<Long> newAnswers = new ArrayList<>(partialAnswers);
-            newAnswers.add(answer);
-            Response.Answer responseAnswer = new Response.Answer(
-                    request,
-                    plan,
-                    newAnswers,
-                    constraints,
-                    unifiers
-            );
+        Response.Answer responseAnswer = new Response.Answer(
+                request,
+                plan,
+                partialAnswer,
+                constraints,
+                unifiers
+        );
 
-            LOG.debug("Responding answer to upstream from actor: " + name);
-            upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
-            responseProducer.decrementRequestsFromUpstream();
-        }
-    }
+        LOG.debug("Responding answer to upstream from actor: " + name);
+        upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
+        responseProducer.decrementRequestsFromUpstream();
+   }
 
     @Override
     void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
@@ -167,13 +133,9 @@ public class RuleActor extends ReasoningActor<RuleActor> {
         }
     }
 
-    private void bufferAnswer(final Request request, final Long answer) {
-        responseProducers.get(request).bufferAnswer(answer);
-    }
-
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream() + responseProducer.bufferedSize();
+        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
@@ -202,9 +164,5 @@ public class RuleActor extends ReasoningActor<RuleActor> {
 
     private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
         responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
-    }
-
-    private Long computeAnswer(final Response.Answer answer) {
-        return answer.partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
     }
 }

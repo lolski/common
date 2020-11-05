@@ -9,8 +9,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import static grakn.common.collection.Collections.list;
-
 public class AtomicActor extends ReasoningActor<AtomicActor> {
     private final Logger LOG;
 
@@ -77,7 +75,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
         // TODO fix accessing state
         if (answerSource(fromDownstream).state instanceof AtomicActor) {
-            registerTraversal(fromUpstream, computeAnswer(fromDownstream.partialAnswers));
+            registerTraversal(fromUpstream, fromDownstream.partialAnswers);
             traverseAndRespond(fromUpstream, forwardingPlan);
             registerDownstreamRules(
                     fromUpstream,
@@ -87,11 +85,10 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                     fromDownstream.unifiers
             );
         } else if (answerSource(fromDownstream).state instanceof RuleActor) {
-            bufferAnswers(fromUpstream, Arrays.asList(computeAnswer(fromDownstream.partialAnswers)));
-            respondAnswersToUpstream(
+            respondAnswerToUpstream(
                     fromUpstream,
                     forwardingPlan,
-                    Arrays.asList(),
+                    fromDownstream.partialAnswers, // TODO may combine with partial answers from the fromUpstream message
                     fromUpstream.constraints,
                     fromUpstream.unifiers,
                     responseProducers.get(fromUpstream),
@@ -106,7 +103,8 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
             requestFromAvailableDownstream(fromUpstream);
         }
 
-        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, getResponsePlan(fromUpstream));
+        if (noMoreAnswersPossible(fromUpstream))
+            respondExhaustedToUpstream(fromUpstream, getResponsePlan(fromUpstream));
     }
 
     @Override
@@ -144,32 +142,28 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
     }
 
     @Override
-    void respondAnswersToUpstream(
+    void respondAnswerToUpstream(
             final Request request,
             final Plan plan,
-            final List<Long> partialAnswers,
+            final List<Long> partialAnswer,
             final List<Object> constraints,
             final List<Object> unifiers,
             final ResponseProducer responseProducer,
             final Actor<? extends ReasoningActor<?>> upstream
     ) {
-        // send as many answers as possible to upstream
-        for (int i = 0; i < Math.min(responseProducer.requestsFromUpstream(), responseProducer.bufferedSize()); i++) {
-            Long answer = responseProducer.bufferTake();
-            List<Long> newAnswers = list(partialAnswers, answer);
-            Response.Answer responseAnswer = new Response.Answer(
-                    request,
-                    plan,
-                    newAnswers,
-                    constraints,
-                    unifiers
-            );
+        Response.Answer responseAnswer = new Response.Answer(
+                request,
+                plan,
+                partialAnswer,
+                constraints,
+                unifiers
+        );
 
-            LOG.debug("Responding answer to upstream from actor: " + name);
-            upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
-            responseProducer.decrementRequestsFromUpstream();
-        }
+        LOG.debug("Responding answer to upstream from actor: " + name);
+        upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
+        responseProducer.decrementRequestsFromUpstream();
     }
+
 
     @Override
     void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
@@ -195,7 +189,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
                 );
                 responseProducer.addAvailableDownstream(toDownstream);
             } else {
-                registerTraversal(request, computeAnswer(request.partialAnswers));
+                registerTraversal(request, request.partialAnswers);
                 registerDownstreamRules(
                         request,
                         request.plan,
@@ -209,38 +203,33 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        List<Long> answers = produceTraversalAnswers(responseProducer);
-        bufferAnswers(fromUpstream, answers);
-        respondAnswersToUpstream(
-                fromUpstream,
-                responsePlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducer,
-                responsePlan.currentStep()
-        );
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswers(responseProducer);
+            respondAnswerToUpstream(
+                    fromUpstream,
+                    responsePlan,
+                    answers, // TODO may combined with partial answers in fromUpstream
+                    fromUpstream.constraints,
+                    fromUpstream.unifiers,
+                    responseProducer,
+                    responsePlan.currentStep()
+            );
+        }
     }
 
     private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
         Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        if (traversalProducer != null) {
-            // TODO could do batch traverse, or retrieve answers from multiple traversals
-            Long answer = traversalProducer.next();
-            if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-            answer += this.traversalPattern;
-            return Arrays.asList(answer);
-        }
-        return Arrays.asList();
+        // TODO could do batch traverse, or retrieve answers from multiple traversals
+        Long answer = traversalProducer.next();
+        if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
+        answer += this.traversalPattern;
+        return Arrays.asList(answer);
     }
 
-    private void registerTraversal(final Request request, final Long answer) {
-        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(answer);
+    private void registerTraversal(final Request request, final List<Long> partialAnswer) {
+        Long mergedAnswer = partialAnswer.stream().reduce(0L, (acc, v) -> acc + v);
+        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(mergedAnswer);
         if (traversal.hasNext()) responseProducers.get(request).addTraversalProducer(traversal);
-    }
-
-    private void bufferAnswers(final Request request, final List<Long> answers) {
-        responseProducers.get(request).bufferAnswers(answers);
     }
 
     private void registerDownstreamRules(final Request request, final Plan basePlan, final List<Long> partialAnswers,
@@ -254,7 +243,7 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream() + responseProducer.bufferedSize();
+        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream();
     }
 
     private boolean noMoreAnswersPossible(final Request fromUpstream) {
@@ -287,10 +276,6 @@ public class AtomicActor extends ReasoningActor<AtomicActor> {
 
     private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
         responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
-    }
-
-    private Long computeAnswer(final List<Long> partialAnswers) {
-        return partialAnswers.stream().reduce(0L, (acc, v) -> acc + v);
     }
 }
 

@@ -18,7 +18,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -57,7 +57,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -102,7 +102,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -146,7 +146,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -188,7 +188,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -237,7 +237,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(4, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
@@ -283,7 +283,7 @@ public class ReasoningTest {
         ActorRegistry actorRegistry = new ActorRegistry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
-        EventLoopGroup eventLoop = new EventLoopGroup(6, "reasoning-elg");
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
