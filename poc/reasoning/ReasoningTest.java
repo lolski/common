@@ -36,7 +36,7 @@ public class ReasoningTest {
         long n = 5L + 5L + 1; //total number of traversal answers
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
@@ -80,7 +80,7 @@ public class ReasoningTest {
         long n = 0L + (2L * 2L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
@@ -125,7 +125,7 @@ public class ReasoningTest {
         long n = 0L + (0L * 0L) + 1; // total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
@@ -168,7 +168,7 @@ public class ReasoningTest {
         long n = 0L + (1L) + (1L) + (1L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
@@ -215,7 +215,7 @@ public class ReasoningTest {
         long n = 0L + (1*1) + (1*2) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
@@ -264,7 +264,7 @@ public class ReasoningTest {
         long n = 0L + (4L*4L*4L) + 1;
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );
@@ -320,7 +320,7 @@ public class ReasoningTest {
         long n = 0L + (10L*10L*10L*10L*10L) + 1;
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
-                    actor.receiveRequest(
+                    actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
                     )
             );

@@ -1,168 +1,69 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class RuleActor extends ExecutionActor<RuleActor> {
-    private final Logger LOG;
-
-    private final String name;
     private final Actor<ConjunctiveActor> whenActor;
 
     public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
                      final Long whenTraversalSize) {
-        super(self, actorRegistry);
-        LOG = LoggerFactory.getLogger(RuleActor.class.getSimpleName() + "-" + when);
-
-        name = String.format("RuleActor(pattern:%s)", when);
+        super(self, actorRegistry, RuleActor.class.getSimpleName() + "(pattern:" + when + ")");
         whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize, null));
     }
 
     @Override
-    public void receiveRequest(final Request fromUpstream) {
-        LOG.debug("Received fromUpstream in: " + name);
-        assert fromUpstream.plan.atEnd() : "A rule that receives a fromUpstream must be at the end of the plan";
-
-        initialiseResponseProducer(fromUpstream);
+    public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
+        assert fromUpstream.plan().atEnd() : "A rule that receives a fromUpstream must be at the end of the plan";
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
-        else {
-            // TODO if we want batching, we increment by as many as are requested
-            incrementRequestsFromUpstream(fromUpstream);
-
-            if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
-                requestFromAvailableDownstream(fromUpstream);
-            }
+        if (!responseProducer.downstreamsExhausted()) {
+            return Either.first(responseProducer.getAvailableDownstream());
+        } else {
+            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
         }
     }
 
     @Override
-    public void receiveAnswer(final Response.Answer fromDownstream) {
-        LOG.debug("Received answer response in: " + name);
-        Request sentDownstream = fromDownstream.sourceRequest();
-        Request fromUpstream = requestRouter.get(sentDownstream);
-
-        decrementRequestToDownstream(fromUpstream);
+    public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer) {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
 
-        respondAnswerToUpstream(
-                fromUpstream,
-                forwardingPlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducers.get(fromUpstream),
-                forwardingPlan.currentStep()
-        );
+        List<Long> newAnwser = fromDownstream.partialAnswers;
 
         // TODO unify and materialise
+
+        return Either.second(
+                new Response.Answer(fromUpstream, forwardingPlan, newAnwser, fromUpstream.constraints, fromUpstream.unifiers));
     }
 
     @Override
-    public void receiveExhausted(final Response.Exhausted fromDownstream) {
-        LOG.debug("Received exhausted response in: " + name);
-        Request sentDownstream = fromDownstream.sourceRequest();
-        Request fromUpstream = requestRouter.get(sentDownstream);
-        decrementRequestToDownstream(fromUpstream);
-
-        downstreamExhausted(fromUpstream, sentDownstream);
+    public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
+        responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
         Plan responsePlan = getResponsePlan(fromUpstream);
-
-        if (noMoreAnswersPossible(fromUpstream))  respondExhaustedToUpstream(fromUpstream, responsePlan);
+        return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
     }
 
-    @Override
-    void requestFromAvailableDownstream(final Request fromUpstream) {
-        Request toDownstream = responseProducers.get(fromUpstream).getAvailableDownstream();
-
-        // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(toDownstream, fromUpstream);
-
-        LOG.debug("Requesting from downstream in: " + name);
-        whenActor.tell(actor -> actor.receiveRequest(toDownstream));
-    }
-
-    @Override
-    void respondAnswerToUpstream(
-            final Request request,
-            final Plan plan,
-            final List<Long> partialAnswer,
-            final List<Object> constraints,
-            final List<Object> unifiers,
-            final ResponseProducer responseProducer,
-            final Actor<? extends ExecutionActor<?>> upstream
-    ) {
-        Response.Answer responseAnswer = new Response.Answer(
-                request,
-                plan,
-                partialAnswer,
-                constraints,
-                unifiers
+    ResponseProducer createResponseProducer(final Request request) {
+        ResponseProducer responseProducer = new ResponseProducer();
+        Plan nextStep = request.plan().addStep(whenActor).toNextStep();
+        Request toDownstream = new Request(
+                nextStep,
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers
         );
-
-        LOG.debug("Responding answer to upstream from actor: " + name);
-        upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
-        responseProducer.decrementRequestsFromUpstream();
-   }
-
-    @Override
-    void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
-        Actor<? extends ExecutionActor<?>> upstream = responsePlan.currentStep();
-        Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
-        LOG.debug("Responding Exhausted to upstream in: " + name);
-        upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
-    }
-
-    private void initialiseResponseProducer(final Request request) {
-        if (!responseProducers.containsKey(request)) {
-            ResponseProducer responseProducer = new ResponseProducer();
-            responseProducers.put(request, responseProducer);
-            Plan nextStep = request.plan.addStep(whenActor).toNextStep();
-            Request toDownstream = new Request(
-                    nextStep,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
-            responseProducer.addAvailableDownstream(toDownstream);
-        }
-    }
-
-    private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream();
-    }
-
-    private boolean noMoreAnswersPossible(final Request fromUpstream) {
-        return responseProducers.get(fromUpstream).noMoreAnswersPossible();
-    }
-
-    private void incrementRequestsFromUpstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).incrementRequestsFromUpstream();
-    }
-
-    private void decrementRequestToDownstream(final Request parentRequest) {
-        responseProducers.get(parentRequest).decrementRequestsToDownstream();
+        responseProducer.addAvailableDownstream(toDownstream);
+        return responseProducer;
     }
 
     private Plan getResponsePlan(final Request fromUpstream) {
-        return fromUpstream.plan.endStepCompleted();
+        return fromUpstream.plan().endStepCompleted();
     }
 
     private Plan forwardingPlan(final Response.Answer fromDownstream) {
         return fromDownstream.plan.endStepCompleted();
-    }
-
-    private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).downstreamsExhausted();
-    }
-
-    private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
     }
 }

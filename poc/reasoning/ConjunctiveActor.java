@@ -1,8 +1,7 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -15,9 +14,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import static grakn.common.collection.Collections.list;
 
 public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
-    private final Logger LOG;
-
-    private final String name;
     private final Long traversalSize;
     @Nullable
     private final LinkedBlockingQueue<Long> responses;
@@ -27,10 +23,8 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
 
     protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
                                final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
-        super(self, actorRegistry);
-        LOG = LoggerFactory.getLogger(ConjunctiveActor.class.getSimpleName() + "-" + conjunction);
+        super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")");
 
-        this.name = "ConjunctiveActor(pattern:" + conjunction + ")";
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
         this.responses = responses;
@@ -38,121 +32,70 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     }
 
     @Override
-    public void receiveRequest(final Request fromUpstream) {
-        LOG.debug("Received request in: " + name);
-        assert fromUpstream.plan.atEnd() : "A conjunction that receives a request must be at the end of the plan";
-
-        initialiseResponseProducer(fromUpstream);
+    public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
+        assert fromUpstream.plan().atEnd() : "A conjunction that receives a request must be at the end of the plan";
 
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
-        else {
-            // TODO if we want batching, we increment by as many as are requested
-            incrementRequestsFromUpstream(fromUpstream);
-
-            if (upstreamHasRequestsOutstanding(fromUpstream)) {
-                traverseAndRespond(fromUpstream, responsePlan);
-            }
-
-            if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
-                requestFromAvailableDownstream(fromUpstream);
-            }
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswer(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+        } else if (!responseProducer.downstreamsExhausted()) {
+            return Either.first(responseProducer.getAvailableDownstream());
+        } else {
+            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
         }
     }
 
     @Override
-    public void receiveAnswer(final Response.Answer fromDownstream) {
-        LOG.debug("Received answer response in: " + name);
-        Request sentDownstream = fromDownstream.sourceRequest();
-        Request fromUpstream = requestRouter.get(sentDownstream);
-
-        decrementRequestToDownstream(fromUpstream);
+    public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
-
-        respondAnswerToUpstream(
-                fromUpstream,
-                forwardingPlan,
-                fromUpstream.partialAnswers,
-                fromUpstream.constraints,
-                fromUpstream.unifiers,
-                responseProducers.get(fromUpstream),
-                forwardingPlan.currentStep()
-        );
+        List<Long> newAnswer = fromDownstream.partialAnswers;
+        return Either.second(
+                new Response.Answer(fromUpstream, forwardingPlan, newAnswer, fromUpstream.constraints, fromUpstream.unifiers));
     }
 
     @Override
-    public void receiveExhausted(final Response.Exhausted fromDownstream) {
-        LOG.debug("Received response exhausted in: " + name);
-        Request sentDownstream = fromDownstream.sourceRequest();
-        Request fromUpstream = requestRouter.get(sentDownstream);
-        decrementRequestToDownstream(fromUpstream);
-
+    public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         // every conjunction has exactly 1 downstream, so an exhausted message must indicate the downstream is exhausted
-        downstreamExhausted(fromUpstream, sentDownstream);
+        responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
         Plan responsePlan = getResponsePlan(fromUpstream);
 
-        if (noMoreAnswersPossible(fromUpstream)) respondExhaustedToUpstream(fromUpstream, responsePlan);
-        else traverseAndRespond(fromUpstream, responsePlan);
-    }
-
-    @Override
-    void requestFromAvailableDownstream(final Request fromUpstream) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        Request toDownstream = responseProducer.getAvailableDownstream();
-        Actor<? extends ExecutionActor<?>> downstream = toDownstream.plan.currentStep();
-
-        // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-        requestRouter.put(toDownstream, fromUpstream);
-
-        LOG.debug("Requesting from downstream in: " + name);
-        downstream.tell(actor -> actor.receiveRequest(toDownstream));
-        responseProducers.get(fromUpstream).incrementRequestsToDownstream();
-    }
-
-    @Override
-    void respondAnswerToUpstream(final Request request,
-                                 final Plan plan,
-                                 final List<Long> partialAnswer,
-                                 final List<Object> constraints,
-                                 final List<Object> unifiers,
-                                 final ResponseProducer responseProducer,
-                                 @Nullable final Actor<? extends ExecutionActor<?>> upstream) {
-        // send as many answers as possible to upstream
-        if (upstream == null) {
-            // base case - how to return from Actor model
-            assert responses != null : this + ": can't return answers because the user answers queue is null";
-            LOG.debug("Saving answer to output queue in: " + name);
-            Long merged = partialAnswer.stream().reduce(0L, (acc, v) -> acc + v);
-            responses.add(merged);
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswer(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
         } else {
-            Response.Answer responseAnswer = new Response.Answer(
-                    request,
-                    plan,
-                    partialAnswer,
-                    constraints,
-                    unifiers
-            );
-
-            LOG.debug("Responding answer to upstream from actor: " + name);
-            upstream.tell((actor) -> actor.receiveAnswer(responseAnswer));
+            if (responsePlan.currentStep() == null) {
+                // base case - how to return from Actor model
+                assert responses != null : this + ": can't return answers because the user answers queue is null";
+                LOG.debug("Writing Exhausted to output queue in: " + name);
+                responses.add(-1L);
+                return null;
+            } else {
+                return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
+            }
         }
-        responseProducer.decrementRequestsFromUpstream();
     }
 
     @Override
-    void respondExhaustedToUpstream(final Request request, final Plan responsePlan) {
-        if (responsePlan.currentStep() == null) {
-            // base case - how to return from Actor model
-            assert responses != null : this + ": can't return answers because the user answers queue is null";
-            LOG.debug("Writing Exhausted to output queue in: " + name);
-            responses.add(-1L);
-        } else {
-            Actor<? extends ExecutionActor<?>> upstream = responsePlan.currentStep();
-            Response.Exhausted responseExhausted = new Response.Exhausted(request, responsePlan);
-            LOG.debug("Responding Exhausted to upstream in: " + name);
-            upstream.tell((actor) -> actor.receiveExhausted(responseExhausted));
-        }
+    ResponseProducer createResponseProducer(final Request request) {
+        ResponseProducer responseProducer = new ResponseProducer();
+
+        Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
+        Request toDownstream = new Request(
+                nextPlan,
+                request.partialAnswers,
+                request.constraints,
+                request.unifiers
+        );
+        responseProducer.addAvailableDownstream(toDownstream);
+
+        Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
+        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
+        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
+        return responseProducer;
     }
 
     private List<Actor<AtomicActor>> plan(final ActorRegistry actorRegistry, final List<Long> conjunction) {
@@ -171,43 +114,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         return planAsActors;
     }
 
-    private void initialiseResponseProducer(final Request request) {
-        if (!responseProducers.containsKey(request)) {
-            ResponseProducer responseProducer = new ResponseProducer();
-            responseProducers.put(request, responseProducer);
-
-            Plan nextPlan = request.plan.addSteps(this.plannedAtomics).toNextStep();
-            Request toDownstream = new Request(
-                    nextPlan,
-                    request.partialAnswers,
-                    request.constraints,
-                    request.unifiers
-            );
-            responseProducer.addAvailableDownstream(toDownstream);
-
-            Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
-            Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
-            if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
-        }
-    }
-
-    private void traverseAndRespond(final Request fromUpstream, final Plan responsePlan) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        if (responseProducer.getOneTraversalProducer() != null) {
-            List<Long> answers = produceTraversalAnswers(responseProducer);
-            respondAnswerToUpstream(
-                    fromUpstream,
-                    responsePlan,
-                    answers,
-                    fromUpstream.constraints,
-                    fromUpstream.unifiers,
-                    responseProducer,
-                    responsePlan.currentStep()
-            );
-        }
-    }
-
-    private List<Long> produceTraversalAnswers(final ResponseProducer responseProducer) {
+    private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
         Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
         // TODO could do batch traverse, or retrieve answers from multiple traversals
         Long answer = traversalProducer.next();
@@ -215,37 +122,12 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         return Arrays.asList(answer);
     }
 
-    private boolean upstreamHasRequestsOutstanding(final Request fromUpstream) {
-        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        return responseProducer.requestsFromUpstream() > responseProducer.requestsToDownstream();
-    }
-
-    private boolean noMoreAnswersPossible(final Request fromUpstream) {
-        return responseProducers.get(fromUpstream).noMoreAnswersPossible();
-    }
-
-    private void incrementRequestsFromUpstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).incrementRequestsFromUpstream();
-    }
-
-    private void decrementRequestToDownstream(final Request fromUpstream) {
-        responseProducers.get(fromUpstream).decrementRequestsToDownstream();
-    }
-
     private Plan getResponsePlan(final Request fromUpstream) {
-        return fromUpstream.plan.endStepCompleted();
+        return fromUpstream.plan().endStepCompleted();
     }
 
     private Plan forwardingPlan(final Response.Answer fromDownstream) {
         return fromDownstream.plan.endStepCompleted();
-    }
-
-    private boolean downstreamAvailable(final Request fromUpstream) {
-        return !responseProducers.get(fromUpstream).downstreamsExhausted();
-    }
-
-    private void downstreamExhausted(final Request fromUpstream, final Request sentDownstream) {
-        responseProducers.get(fromUpstream).downstreamExhausted(sentDownstream);
     }
 
 }

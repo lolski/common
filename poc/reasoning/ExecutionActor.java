@@ -37,7 +37,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     /*
     Handlers for messages sent into the execution actor that are dispatched via the actor model
      */
-    void executeReceiveRequest(final Request fromUpstream) {
+    public void executeReceiveRequest(final Request fromUpstream) {
         LOG.debug("Received fromUpstream in: " + name);
 
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
@@ -99,6 +99,8 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         responseProducer.decrementRequestsToDownstream();
 
         Either<Request, Response> action = receiveExhausted(fromUpstream, fromDownstream, responseProducer);
+        if (action == null) return;
+
         if (action.isFirst()) {
             LOG.debug("Requesting from downstream in: " + name);
             Request request = action.first();
