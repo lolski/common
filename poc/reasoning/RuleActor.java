@@ -6,12 +6,15 @@ import grakn.common.concurrent.actor.Actor;
 import java.util.List;
 
 public class RuleActor extends ExecutionActor<RuleActor> {
-    private final Actor<ConjunctiveActor> whenActor;
+    private final List<Long> when;
+    private final Long whenTraversalSize;
+    private Actor<ConjunctiveActor> whenActor = null;
 
     public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
                      final Long whenTraversalSize) {
         super(self, actorRegistry, RuleActor.class.getSimpleName() + "(pattern:" + when + ")");
-        whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize));
+        this.when = when;
+        this.whenTraversalSize = whenTraversalSize;
     }
 
     @Override
@@ -46,7 +49,10 @@ public class RuleActor extends ExecutionActor<RuleActor> {
         return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
     }
 
+    @Override
     ResponseProducer createResponseProducer(final Request request) {
+        if (whenActor == null) whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize));
+
         ResponseProducer responseProducer = new ResponseProducer();
         Plan nextStep = request.plan().addStep(whenActor).toNextStep();
         Request toDownstream = new Request(

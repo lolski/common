@@ -17,7 +17,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     private final Long traversalSize;
     @Nullable
     private final List<Long> conjunction;
-    private final List<Actor<AtomicActor>> plannedAtomics;
+    private List<Actor<AtomicActor>> plannedAtomics = null;
 
 
     protected ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
@@ -26,7 +26,6 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
-        this.plannedAtomics = plan(actorRegistry, this.conjunction);
     }
 
 
@@ -36,7 +35,6 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
-        this.plannedAtomics = plan(actorRegistry, this.conjunction);
     }
 
     @Override
@@ -81,6 +79,8 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
+        if (plannedAtomics == null) plannedAtomics = plan(actorRegistry, this.conjunction);
+
         ResponseProducer responseProducer = new ResponseProducer();
 
         Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();

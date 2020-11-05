@@ -337,14 +337,14 @@ public class ReasoningTest {
     }
 
     @Test
-    public void bulkActorCreation() {
+    public void bulkActorCreation() throws InterruptedException {
         ActorRegistry actorRegistry = new ActorRegistry();
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         List<List<Long>> rules = new ArrayList<>();
-        for (long i = 2L; i < 217; i++) {
+        for (long i = 2L; i < 1000_000L; i++) {
             rules.add(Arrays.asList(i));
         }
         long start = System.currentTimeMillis();
@@ -352,6 +352,12 @@ public class ReasoningTest {
                 rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, actorRegistry, pattern, 1L, rules))).awaitUnchecked()
         );
         Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor -> actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, actorRegistry, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
+        conjunctive.tell(actor ->
+                actor.executeReceiveRequest(
+                        new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList())
+                )
+        );
+        responses.take();
         long elapsed = System.currentTimeMillis() - start;
         System.out.println("elapsed = " + elapsed);
     }

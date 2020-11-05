@@ -12,24 +12,38 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
 
     private final Long traversalPattern;
     private final long traversalSize;
-    private final List<Actor<RuleActor>> ruleActors;
+    private final List<List<Long>> rules;
+    private List<Actor<RuleActor>> ruleActors = null;
 
     public AtomicActor(final Actor<AtomicActor> self, final ActorRegistry actorRegistry, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
         super(self, actorRegistry, AtomicActor.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
-        ruleActors = registerRuleActors(actorRegistry, rules);
+        this.rules = rules;
     }
 
     private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
+        long everythingElseStart = System.nanoTime();
+        long[] childElapsed = new long[] {0};
+        long[] ruleElapsed = new long[] {0};
         final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
         for (List<Long> rule : rules) {
-            System.out.println("rule: " + rule.get(0));
-            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
-                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L))
-            );
+            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern -> {
+                long childStart = System.nanoTime();
+                Actor<RuleActor> child = child(actor -> {
+                    long ruleStart = System.nanoTime();
+                    RuleActor ruleActor1 = new RuleActor(actor, actorRegistry, pattern, 1L);
+                    ruleElapsed[0] += System.nanoTime() - ruleStart;
+                    return ruleActor1;
+                });
+                childElapsed[0] += System.nanoTime() - childStart;
+                return child;
+            });
             ruleActors.add(ruleActor);
         }
+        System.out.println("elapsed (rule) = " + (ruleElapsed[0])/ 1000000.0 + "ms");
+        System.out.println("elapsed (child + rule) = " + childElapsed[0] / 1000000.0 + "ms");
+        System.out.println("elapsed (everything else) = " + (System.nanoTime() - everythingElseStart - childElapsed[0])/ 1000000.0 + "ms");
         return ruleActors;
     }
 
@@ -95,6 +109,8 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
+        if (ruleActors == null) ruleActors = registerRuleActors(actorRegistry, rules);
+
         ResponseProducer responseProducer = new ResponseProducer();
 
         boolean hasDownstream = request.plan().nextStep() != null;
