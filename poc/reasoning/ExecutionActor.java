@@ -26,11 +26,102 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         requestRouter = new HashMap<>();
     }
 
-    public abstract Either<Request, Response> receiveRequest(final Request fromUpstream);
+    abstract ResponseProducer createResponseProducer(final Request fromUpstream);
 
-    public abstract Either<Request, Response.Answer> receiveAnswer(final Response.Answer fromDownstream);
+    abstract Either<Request, Response> receiveRequest(final Request fromUpstream);
 
-    public abstract Either<Request, Response.Exhausted> receiveExhausted(final Response.Exhausted fromDownstream);
+    abstract Either<Request, Response.Answer> receiveAnswer(final Response.Answer fromDownstream);
+
+    abstract Either<Request, Response> receiveExhausted(final Response.Exhausted fromDownstream);
+
+    /*
+    Handlers for messages sent into the execution actor that are dispatched via the actor model
+     */
+    void executeReceiveRequest(final Request fromUpstream) {
+        LOG.debug("Received fromUpstream in: " + name);
+
+        ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
+        responseProducer.incrementRequestsFromUpstream();
+        Either<Request, Response> action = receiveRequest(fromUpstream);
+        if (action.isFirst()) {
+            LOG.debug("Requesting from downstream in: " + name);
+            Request request = action.first();
+            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
+            requestRouter.put(request, fromUpstream);
+            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
+            responseProducer.incrementRequestsToDownstream();
+            targetActor.tell(actor -> actor.executeReceiveRequest(request));
+        } else {
+            Response response = action.second();
+            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
+            if (response.isAnswer()) {
+                LOG.debug("Responding answer to upstream from actor: " + name);
+                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
+            } else if (response.isExhausted()) {
+                LOG.debug("Responding Exhausted to upstream from actor: " + name);
+                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
+            } else {
+                throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
+            }
+            responseProducer.decrementRequestsFromUpstream();
+        }
+    }
+
+    void executeReceiveAnswer(final Response.Answer fromDownstream) {
+        LOG.debug("Received fromDownstream response in: " + name);
+        Request sentDownstream = fromDownstream.sourceRequest();
+        Request fromUpstream = requestRouter.get(sentDownstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        responseProducer.decrementRequestsToDownstream();
+        Either<Request, Response.Answer> action = receiveAnswer(fromDownstream);
+        if (action.isFirst()) {
+            LOG.debug("Requesting from downstream in: " + name);
+            Request request = action.first();
+            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
+            requestRouter.put(request, fromUpstream);
+            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
+            responseProducer.incrementRequestsToDownstream();
+            targetActor.tell(actor -> actor.executeReceiveRequest(request));
+        } else {
+            Response response = action.second();
+            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
+            LOG.debug("Responding answer to upstream from actor: " + name);
+            responseProducer.decrementRequestsFromUpstream();
+            targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
+        }
+    }
+
+    void executeReceiveExhausted(final Response.Exhausted fromDownstream) {
+        LOG.debug("Received fromDownstream response in: " + name);
+        Request sentDownstream = fromDownstream.sourceRequest();
+        Request fromUpstream = requestRouter.get(sentDownstream);
+        ResponseProducer responseProducer = responseProducers.get(fromUpstream);
+        responseProducer.decrementRequestsToDownstream();
+
+        Either<Request, Response> action = receiveExhausted(fromDownstream);
+        if (action.isFirst()) {
+            LOG.debug("Requesting from downstream in: " + name);
+            Request request = action.first();
+            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
+            requestRouter.put(request, fromUpstream);
+            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
+            responseProducer.incrementRequestsToDownstream();
+            targetActor.tell(actor -> actor.executeReceiveRequest(request));
+        } else {
+            Response response = action.second();
+            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
+            if (response.isAnswer()) {
+                LOG.debug("Responding answer to upstream from actor: " + name);
+                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
+            } else if (response.isExhausted()) {
+                LOG.debug("Responding Exhausted to upstream from actor: " + name);
+                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
+            } else {
+                throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
+            }
+            responseProducer.decrementRequestsFromUpstream();
+        }
+    }
 
     abstract void requestFromAvailableDownstream(final Request request);
 
@@ -43,45 +134,4 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
                                           final Actor<? extends ExecutionActor<?>> upstream);
 
     abstract void respondExhaustedToUpstream(final Request request, final Plan responsePlan);
-
-    abstract ResponseProducer createResponseProducer(final Request fromUpstream);
-
-    /*
-    Handlers for messages sent into the execution actor that are dispatched via the actor model
-     */
-    void executeReceiveRequest(final Request fromUpstream) {
-        LOG.debug("Received fromUpstream in: " + name);
-
-        ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
-
-        Either<Request, Response> requestResponse = receiveRequest(fromUpstream);
-        if (requestResponse.isFirst()) {
-            Request request = requestResponse.first();
-            // TODO we may overwrite if multiple identical requests are sent, when to clean up?
-            requestRouter.put(request, fromUpstream);
-            responseProducer.incrementRequestsToDownstream();
-            Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
-            LOG.debug("Requesting from downstream in: " + name);
-            targetActor.tell(actor -> actor.executeReceiveRequest(request));
-        } else {
-            // TODO resume here
-            Response response = requestResponse.second();
-            Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
-            if (response.isAnswer()) {
-                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
-            } else if (response.isExhausted()) {
-                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
-            } else {
-                throw new RuntimeException(("Unknown response type " + response.getClass().getSimpleName()));
-            }
-        }
-    }
-
-    void executeReceiveAnswer(final Response.Answer fromDownstream) {
-
-    }
-
-    void executeReceiveExhausted(final Response.Exhausted fromDownstream) {
-
-    }
 }

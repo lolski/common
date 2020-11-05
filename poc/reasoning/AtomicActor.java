@@ -95,9 +95,6 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
         if (upstreamHasRequestsOutstanding(fromUpstream) && downstreamAvailable(fromUpstream)) {
             requestFromAvailableDownstream(fromUpstream);
         }
-
-        if (noMoreAnswersPossible(fromUpstream))
-            respondExhaustedToUpstream(fromUpstream, getResponsePlan(fromUpstream));
     }
 
     @Override
