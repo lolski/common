@@ -1,5 +1,6 @@
 package grakn.common.poc.reasoning;
 
+import grakn.common.collection.Collections;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
@@ -8,8 +9,10 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static grakn.common.collection.Collections.list;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
 
@@ -324,7 +327,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (10L*10L*10L*10L*10L) + 1;
+        long n = 0L + 10 * (10L*10L*10L*10L*10L) + 1;
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
@@ -367,5 +370,27 @@ public class ReasoningTest {
         responses.take();
         long elapsed = System.currentTimeMillis() - start;
         System.out.println("elapsed = " + elapsed);
+    }
+
+    @Test
+    public void loopTermination() throws InterruptedException {
+        ActorRegistry actorRegistry = new ActorRegistry();
+        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
+
+        // conjunction1 -> atomic1 -> rule1 -> conjunction2 -> atomic1
+        actorRegistry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<RuleActor>createActor(self -> new RuleActor(self, pattern, 0L))).awaitUnchecked());
+        actorRegistry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 0L, list(list(1L))))).awaitUnchecked());
+        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor -> actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
+
+        conjunctive.tell(actor ->
+                actor.executeReceiveRequest(
+                        new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                        actorRegistry
+                )
+        );
+
+        responses.take();
     }
 }
