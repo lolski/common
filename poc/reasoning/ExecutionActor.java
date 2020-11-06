@@ -5,18 +5,20 @@ import grakn.common.concurrent.actor.Actor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T>{
-    static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
-    String name;
+    private static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
 
+    String name;
+    private boolean isInitialised;
+    @Nullable
     private final LinkedBlockingQueue<Long> responses;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
-    private boolean isInitialised;
 
     protected ExecutionActor(final Actor<T> self, final String name) {
         this(self, name, null);
@@ -25,10 +27,10 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     protected ExecutionActor(final Actor<T> self, final String name, LinkedBlockingQueue<Long> responses) {
         super(self);
         this.name = name;
+        isInitialised = false;
+        this.responses = responses;
         responseProducers = new HashMap<>();
         requestRouter = new HashMap<>();
-        this.responses = responses;
-        isInitialised = false;
     }
 
     abstract ResponseProducer createResponseProducer(final Request fromUpstream);
@@ -42,8 +44,10 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     abstract Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer);
 
     /*
-    Handlers for messages sent into the execution actor that are dispatched via the actor model
-     */
+     *
+     * Handlers for messages sent into the execution actor that are dispatched via the actor model.
+     *
+     * */
     public void executeReceiveRequest(final Request fromUpstream, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": Received a new Request from upstream");
         if (!isInitialised) {
@@ -53,7 +57,6 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         }
 
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
-        responseProducer.incrementRequestsFromUpstream();
         Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
         if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer, actorRegistry);
         else respondToUpstream(action.second(), responseProducer, actorRegistry);
@@ -64,7 +67,6 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        responseProducer.decrementRequestsToDownstream();
         Either<Request, Response> action = receiveAnswer(fromUpstream, fromDownstream, responseProducer);
 
         if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer, actorRegistry);
@@ -76,7 +78,6 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
-        responseProducer.decrementRequestsToDownstream();
 
         Either<Request, Response> action = receiveExhausted(fromUpstream, fromDownstream, responseProducer);
 
@@ -85,12 +86,16 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
 
     }
 
+    /*
+     *
+     * Helper method private to this class.
+     *
+     * */
     private void requestFromDownstream(final Request request, final Request fromUpstream, final ResponseProducer responseProducer, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": requesting from downstream");
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
         Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
-        responseProducer.incrementRequestsToDownstream();
         targetActor.tell(actor -> actor.executeReceiveRequest(request, actorRegistry));
     }
 
@@ -116,7 +121,6 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
             } else {
                 throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
             }
-            responseProducer.decrementRequestsFromUpstream();
         }
     }
 }

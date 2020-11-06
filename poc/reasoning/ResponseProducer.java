@@ -9,8 +9,6 @@ import java.util.List;
 class ResponseProducer {
     private final List<Request> downstreamsAvailable;
     private List<Iterator<Long>> traversalProducers;
-    private int requestsFromUpstream = 0;
-    private int requestsToDownstream = 0;
 
     public ResponseProducer() {
         this.downstreamsAvailable = new ArrayList<>();
@@ -45,21 +43,5 @@ class ResponseProducer {
 
     public void downstreamExhausted(final Request request) {
         downstreamsAvailable.remove(request);
-    }
-
-    public void incrementRequestsFromUpstream() {
-        requestsFromUpstream++;
-    }
-
-    public void decrementRequestsFromUpstream() {
-        requestsFromUpstream--;
-    }
-
-    public void incrementRequestsToDownstream() {
-        requestsToDownstream++;
-    }
-
-    public void decrementRequestsToDownstream() {
-        requestsToDownstream--;
     }
 }
