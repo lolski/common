@@ -104,7 +104,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         if (targetActor == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             if (response.isAnswer()) {
-                Long mergedAnswer = response.asAnswer().partialAnswers.stream().reduce(0L, (acc, val) -> acc + val);
+                Long mergedAnswer = response.asAnswer().partialAnswer.stream().reduce(0L, (acc, val) -> acc + val);
                 LOG.debug(name + ": Writing Answer to output queue");
                 responses.add(mergedAnswer);
             } else {

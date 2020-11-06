@@ -34,7 +34,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer) {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
 
-        List<Long> newAnwser = fromDownstream.partialAnswers;
+        List<Long> newAnwser = fromDownstream.partialAnswer;
 
         // TODO unify and materialise
 
@@ -55,7 +55,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
         Plan nextStep = request.plan().addStep(whenActor).toNextStep();
         Request toDownstream = new Request(
                 nextStep,
-                request.partialAnswers,
+                request.partialAnswer,
                 request.constraints,
                 request.unifiers
         );

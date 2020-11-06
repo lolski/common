@@ -51,7 +51,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
-        List<Long> newAnswer = fromDownstream.partialAnswers;
+        List<Long> newAnswer = fromDownstream.partialAnswer;
         return Either.second(
                 new Response.Answer(fromUpstream, forwardingPlan, newAnswer, fromUpstream.constraints, fromUpstream.unifiers));
     }
@@ -76,7 +76,7 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         ResponseProducer responseProducer = new ResponseProducer();
 
         Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
-        Request toDownstream = new Request(nextPlan, request.partialAnswers, request.constraints, request.unifiers);
+        Request toDownstream = new Request(nextPlan, request.partialAnswer, request.constraints, request.unifiers);
         responseProducer.addAvailableDownstream(toDownstream);
 
         Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();

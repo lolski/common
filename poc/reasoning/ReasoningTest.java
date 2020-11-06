@@ -103,7 +103,6 @@ public class ReasoningTest {
         assertTrue(responses.isEmpty());
     }
 
-
     @Test
     public void filteringAtomicActor() throws InterruptedException {
         ActorRegistry actorRegistry = new ActorRegistry();
@@ -241,7 +240,6 @@ public class ReasoningTest {
         assertTrue(responses.isEmpty());
     }
 
-
     @Test
     public void shallowRerequest() throws InterruptedException {
         ActorRegistry actorRegistry = new ActorRegistry();
@@ -374,7 +372,6 @@ public class ReasoningTest {
     }
 
     @Test
-    @Ignore
     public void loopTermination() throws InterruptedException {
         ActorRegistry actorRegistry = new ActorRegistry();
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
@@ -382,17 +379,24 @@ public class ReasoningTest {
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // conjunction1 -> atomic1 -> rule1 -> conjunction2 -> atomic1
-        actorRegistry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<RuleActor>createActor(self -> new RuleActor(self, pattern, 0L))).awaitUnchecked());
-        actorRegistry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 0L, list(list(1L))))).awaitUnchecked());
+        actorRegistry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<RuleActor>createActor(self -> new RuleActor(self, pattern, 1L))).awaitUnchecked());
+        actorRegistry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
         Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor -> actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
 
-        conjunctive.tell(actor ->
-                actor.executeReceiveRequest(
-                        new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                        actorRegistry
-                )
-        );
-
-        responses.take();
+        long n = 0L + 1L + 1L + 1L + 1;
+        for (int i = 0; i < n; i++) {
+            conjunctive.tell(actor ->
+                    actor.executeReceiveRequest(
+                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            actorRegistry
+                    )
+            );
+        }
+        for (int i = 0; i < n - 1; i++) {
+            Long answer = responses.take();
+            assertTrue(answer != -1);
+        }
+        assertEquals(responses.take().longValue(), -1L);
+        assertTrue(responses.isEmpty());
     }
 }
