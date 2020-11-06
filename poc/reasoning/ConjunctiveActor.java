@@ -11,25 +11,24 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static grakn.common.collection.Collections.list;
-
 public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     private final Long traversalSize;
     @Nullable
     private final List<Long> conjunction;
-    private List<Actor<AtomicActor>> plannedAtomics = null;
+    private List<Actor<AtomicActor>> plannedAtomics;
 
-    ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
+    ConjunctiveActor(final Actor<ConjunctiveActor> self, final List<Long> conjunction,
                                final Long traversalSize) {
-        this(self, actorRegistry, conjunction, traversalSize, null);
+        this(self, conjunction, traversalSize, null);
     }
 
-    ConjunctiveActor(final Actor<ConjunctiveActor> self, final ActorRegistry actorRegistry, final List<Long> conjunction,
+    ConjunctiveActor(final Actor<ConjunctiveActor> self, final List<Long> conjunction,
                                final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
-        super(self, actorRegistry, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
+        super(self, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
+        this.plannedAtomics = new ArrayList<>();
     }
 
     @Override
@@ -74,8 +73,6 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
-        if (plannedAtomics == null) plannedAtomics = plan(actorRegistry, this.conjunction);
-
         ResponseProducer responseProducer = new ResponseProducer();
 
         Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
@@ -88,20 +85,17 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         return responseProducer;
     }
 
-    private List<Actor<AtomicActor>> plan(final ActorRegistry actorRegistry, final List<Long> conjunction) {
+    @Override
+    void initialiseDownstreamActors(ActorRegistry actorRegistry) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
         planned = Collections.unmodifiableList(planned);
-        List<Actor<AtomicActor>> planAsActors = new ArrayList<>();
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
             Actor<AtomicActor> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
-                    child((newActor) -> new AtomicActor(newActor, actorRegistry, pattern, 5L, Arrays.asList())));
-            planAsActors.add(atomicActor);
+                    child((newActor) -> new AtomicActor(newActor, pattern, 5L, Arrays.asList())));
+            plannedAtomics.add(atomicActor);
         }
-
-        // plan the atomics in the conjunction
-        return planAsActors;
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {

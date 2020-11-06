@@ -14,29 +14,26 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     String name;
 
     private final LinkedBlockingQueue<Long> responses;
-    final ActorRegistry actorRegistry;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
+    private boolean isInitialised;
 
-    protected ExecutionActor(final Actor<T> self, final ActorRegistry actorRegistry, final String name, LinkedBlockingQueue<Long> responses) {
+    protected ExecutionActor(final Actor<T> self, final String name) {
+        this(self, name, null);
+    }
+
+    protected ExecutionActor(final Actor<T> self, final String name, LinkedBlockingQueue<Long> responses) {
         super(self);
-        this.actorRegistry = actorRegistry;
         this.name = name;
         responseProducers = new HashMap<>();
         requestRouter = new HashMap<>();
         this.responses = responses;
-    }
-
-    protected ExecutionActor(final Actor<T> self, final ActorRegistry actorRegistry, final String name) {
-        super(self);
-        this.actorRegistry = actorRegistry;
-        this.name = name;
-        responseProducers = new HashMap<>();
-        requestRouter = new HashMap<>();
-        this.responses = null;
+        isInitialised = false;
     }
 
     abstract ResponseProducer createResponseProducer(final Request fromUpstream);
+
+    abstract void initialiseDownstreamActors(ActorRegistry actorRegistry);
 
     abstract Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer);
 
@@ -47,17 +44,22 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     /*
     Handlers for messages sent into the execution actor that are dispatched via the actor model
      */
-    public void executeReceiveRequest(final Request fromUpstream) {
+    public void executeReceiveRequest(final Request fromUpstream, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": Received a new Request from upstream");
+        if (!isInitialised) {
+            LOG.debug(name + ": initialising downstream actors");
+            initialiseDownstreamActors(actorRegistry);
+            isInitialised = true;
+        }
 
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
         responseProducer.incrementRequestsFromUpstream();
         Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
-        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer);
-        else respondToUpstream(action.second(), responseProducer);
+        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer, actorRegistry);
+        else respondToUpstream(action.second(), responseProducer, actorRegistry);
     }
 
-    void executeReceiveAnswer(final Response.Answer fromDownstream) {
+    void executeReceiveAnswer(final Response.Answer fromDownstream, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": Received a new Answer from downstream");
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
@@ -65,11 +67,11 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         responseProducer.decrementRequestsToDownstream();
         Either<Request, Response> action = receiveAnswer(fromUpstream, fromDownstream, responseProducer);
 
-        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer);
-        else respondToUpstream(action.second(), responseProducer);
+        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer, actorRegistry);
+        else respondToUpstream(action.second(), responseProducer, actorRegistry);
     }
 
-    void executeReceiveExhausted(final Response.Exhausted fromDownstream) {
+    void executeReceiveExhausted(final Response.Exhausted fromDownstream, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": Received a new Exhausted from downstream");
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
@@ -78,21 +80,21 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
 
         Either<Request, Response> action = receiveExhausted(fromUpstream, fromDownstream, responseProducer);
 
-        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream,  responseProducer);
-        else respondToUpstream(action.second(), responseProducer);
+        if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream,  responseProducer, actorRegistry);
+        else respondToUpstream(action.second(), responseProducer, actorRegistry);
 
     }
 
-    private void requestFromDownstream(Request request, Request fromUpstream, ResponseProducer responseProducer) {
+    private void requestFromDownstream(final Request request, final Request fromUpstream, final ResponseProducer responseProducer, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": requesting from downstream");
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
         Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
         responseProducer.incrementRequestsToDownstream();
-        targetActor.tell(actor -> actor.executeReceiveRequest(request));
+        targetActor.tell(actor -> actor.executeReceiveRequest(request, actorRegistry));
     }
 
-    private void respondToUpstream(Response response, ResponseProducer responseProducer) {
+    private void respondToUpstream(final Response response, final ResponseProducer responseProducer, final ActorRegistry actorRegistry) {
         Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
         if (targetActor == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
@@ -107,10 +109,10 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         } else {
             if (response.isAnswer()) {
                 LOG.debug(name + ": Responding to upstream with an Answer");
-                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer()));
+                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer(), actorRegistry));
             } else if (response.isExhausted()) {
                 LOG.debug(name + ": Responding to upstream with an Exhausted");
-                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted()));
+                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted(), actorRegistry));
             } else {
                 throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
             }

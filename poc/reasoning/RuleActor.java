@@ -10,9 +10,9 @@ public class RuleActor extends ExecutionActor<RuleActor> {
     private final Long whenTraversalSize;
     private Actor<ConjunctiveActor> whenActor = null;
 
-    public RuleActor(final Actor<RuleActor> self, final ActorRegistry actorRegistry, final List<Long> when,
+    public RuleActor(final Actor<RuleActor> self, final List<Long> when,
                      final Long whenTraversalSize) {
-        super(self, actorRegistry, RuleActor.class.getSimpleName() + "(pattern:" + when + ")");
+        super(self, RuleActor.class.getSimpleName() + "(pattern:" + when + ")");
         this.when = when;
         this.whenTraversalSize = whenTraversalSize;
     }
@@ -51,8 +51,6 @@ public class RuleActor extends ExecutionActor<RuleActor> {
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
-        if (whenActor == null) whenActor = child((newActor) -> new ConjunctiveActor(newActor, actorRegistry, when, whenTraversalSize));
-
         ResponseProducer responseProducer = new ResponseProducer();
         Plan nextStep = request.plan().addStep(whenActor).toNextStep();
         Request toDownstream = new Request(
@@ -63,6 +61,11 @@ public class RuleActor extends ExecutionActor<RuleActor> {
         );
         responseProducer.addAvailableDownstream(toDownstream);
         return responseProducer;
+    }
+
+    @Override
+    void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+        whenActor = child((newActor) -> new ConjunctiveActor(newActor, when, whenTraversalSize));
     }
 
     private Plan respondingPlan(final Request fromUpstream) {

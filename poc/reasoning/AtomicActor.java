@@ -13,13 +13,14 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     private final Long traversalPattern;
     private final long traversalSize;
     private final List<List<Long>> rules;
-    private List<Actor<RuleActor>> ruleActors = null;
+    private List<Actor<RuleActor>> ruleActors;
 
-    public AtomicActor(final Actor<AtomicActor> self, final ActorRegistry actorRegistry, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
-        super(self, actorRegistry, AtomicActor.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
+    public AtomicActor(final Actor<AtomicActor> self, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
+        super(self, AtomicActor.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
         this.rules = rules;
+        this.ruleActors = new ArrayList<>();
     }
 
     @Override
@@ -84,7 +85,6 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
-        if (ruleActors == null) ruleActors = registerRuleActors(actorRegistry, rules);
 
         ResponseProducer responseProducer = new ResponseProducer();
 
@@ -98,6 +98,15 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
             registerDownstreamRules(responseProducer, request.plan(), request.partialAnswers, request.constraints, request.unifiers);
         }
         return responseProducer;
+    }
+
+    @Override
+    void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+        for (List<Long> rule : rules) {
+            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
+                    child(actor -> new RuleActor(actor, pattern, 1L)));
+            ruleActors.add(ruleActor);
+        }
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
@@ -122,16 +131,6 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
             Request toDownstream = new Request(toRule, partialAnswers, constraints, unifiers);
             responseProducer.addAvailableDownstream(toDownstream);
         }
-    }
-
-    private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
-        final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
-        for (List<Long> rule : rules) {
-            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
-                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L)));
-            ruleActors.add(ruleActor);
-        }
-        return ruleActors;
     }
 
     private Actor<? extends ExecutionActor<?>> answerSource(final Response.Answer answer) {
