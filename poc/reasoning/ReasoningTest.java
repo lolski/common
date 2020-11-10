@@ -1,6 +1,5 @@
 package grakn.common.poc.reasoning;
 
-import grakn.common.concurrent.NamedThreadFactory;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;

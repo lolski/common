@@ -3,7 +3,6 @@ package grakn.common.poc.reasoning;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 
 class ResponseProducer {

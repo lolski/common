@@ -11,8 +11,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static grakn.common.collection.Collections.list;
-
 public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
     private final Long traversalSize;
     @Nullable
