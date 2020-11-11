@@ -5,36 +5,31 @@ import grakn.common.concurrent.actor.Actor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 public class AtomicActor extends ExecutionActor<AtomicActor> {
 
     private final Long traversalPattern;
     private final long traversalSize;
-    private final List<Actor<RuleActor>> ruleActors;
+    private final List<List<Long>> rules;
+    private List<Actor<RuleActor>> ruleActors;
+    private Set<RuleTrigger> triggered;
 
-    public AtomicActor(final Actor<AtomicActor> self, final ActorRegistry actorRegistry, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
-        super(self, actorRegistry, AtomicActor.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
+    public AtomicActor(final Actor<AtomicActor> self, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
+        super(self, AtomicActor.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
-        ruleActors = registerRuleActors(actorRegistry, rules);
-    }
-
-    private List<Actor<RuleActor>> registerRuleActors(final ActorRegistry actorRegistry, final List<List<Long>> rules) {
-        final List<Actor<RuleActor>> ruleActors = new ArrayList<>();
-        for (List<Long> rule : rules) {
-            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
-                    child(actor -> new RuleActor(actor, actorRegistry, pattern, 1L))
-            );
-            ruleActors.add(ruleActor);
-        }
-        return ruleActors;
+        this.rules = rules;
+        ruleActors = new ArrayList<>();
+        triggered = new HashSet<>();
     }
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
 
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
@@ -53,9 +48,13 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
 
         // TODO fix accessing actor state directly
         if (answerSource(fromDownstream).state instanceof AtomicActor) {
-            registerTraversal(responseProducer, fromDownstream.partialAnswers);
-            registerDownstreamRules(responseProducer, fromDownstream.plan, fromDownstream.partialAnswers,
-                    fromDownstream.constraints, fromDownstream.unifiers);
+            registerTraversal(responseProducer, fromDownstream.partialAnswer);
+            RuleTrigger trigger = new RuleTrigger(fromDownstream.partialAnswer, fromDownstream.constraints);
+            if (!triggered.contains(trigger)) {
+                registerDownstreamRules(responseProducer, fromDownstream.plan, fromDownstream.partialAnswer,
+                        fromDownstream.constraints, fromDownstream.unifiers);
+                triggered.add(trigger);
+            }
 
             if (responseProducer.getOneTraversalProducer() != null) {
                 List<Long> answers = produceTraversalAnswer(responseProducer);
@@ -69,7 +68,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
         } else if (answerSource(fromDownstream).state instanceof RuleActor) {
             // TODO may combine with partial answers from the fromUpstream message
             return Either.second(
-                    new Response.Answer(fromUpstream, forwardingPlan, fromDownstream.partialAnswers,
+                    new Response.Answer(fromUpstream, forwardingPlan, fromDownstream.partialAnswer,
                             fromUpstream.constraints, fromUpstream.unifiers));
         } else {
             throw new RuntimeException("Unhandled downstream actor of type " +
@@ -80,7 +79,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
-        Plan responsePlan = getResponsePlan(fromUpstream);
+        Plan responsePlan = respondingPlan(fromUpstream);
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answer = produceTraversalAnswer(responseProducer);
             return Either.second(
@@ -94,18 +93,34 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
+
         ResponseProducer responseProducer = new ResponseProducer();
 
         boolean hasDownstream = request.plan().nextStep() != null;
         if (hasDownstream) {
             Plan nextStep = request.plan().toNextStep();
-            Request toDownstream = new Request(nextStep, request.partialAnswers, request.constraints, request.unifiers);
+            Request toDownstream = new Request(nextStep, request.partialAnswer, request.constraints, request.unifiers);
             responseProducer.addAvailableDownstream(toDownstream);
         } else {
-            registerTraversal(responseProducer, request.partialAnswers);
-            registerDownstreamRules(responseProducer, request.plan(), request.partialAnswers, request.constraints, request.unifiers);
+            registerTraversal(responseProducer, request.partialAnswer);
+            RuleTrigger trigger = new RuleTrigger(request.partialAnswer, request.constraints);
+            if (!triggered.contains(trigger)) {
+                registerDownstreamRules(responseProducer, request.plan(), request.partialAnswer,
+                        request.constraints, request.unifiers);
+                triggered.add(trigger);
+            }
+
         }
         return responseProducer;
+    }
+
+    @Override
+    void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+        for (List<Long> rule : rules) {
+            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
+                    child(actor -> new RuleActor(actor, pattern, 1L)));
+            ruleActors.add(ruleActor);
+        }
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
@@ -136,7 +151,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
         return answer.sourceRequest().plan().currentStep();
     }
 
-    private Plan getResponsePlan(final Request fromUpstream) {
+    private Plan respondingPlan(final Request fromUpstream) {
         return fromUpstream.plan().truncate().endStepCompleted();
     }
 

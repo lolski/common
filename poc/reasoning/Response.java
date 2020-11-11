@@ -20,18 +20,18 @@ interface Response {
     class Answer implements Response {
         private final Request sourceRequest;
         final Plan plan;
-        final List<Long> partialAnswers;
+        final List<Long> partialAnswer;
         final List<Object> constraints;
         final List<Object> unifiers;
 
         public Answer(final Request sourceRequest,
                       final Plan plan,
-                      final List<Long> partialAnswers,
+                      final List<Long> partialAnswer,
                       final List<Object> constraints,
                       final List<Object> unifiers) {
             this.sourceRequest = sourceRequest;
             this.plan = plan;
-            this.partialAnswers = partialAnswers;
+            this.partialAnswer = partialAnswer;
             this.constraints = constraints;
             this.unifiers = unifiers;
         }
