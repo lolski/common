@@ -373,6 +373,7 @@ public class ReasoningTest {
         System.out.println("elapsed = " + elapsed);
     }
 
+    // TODO: start looking at deadlock here
     @Test
     public void loopTermination() throws InterruptedException {
         Registry registry = new Registry();
