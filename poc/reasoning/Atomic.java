@@ -3,7 +3,6 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.execution.ExecutionActor;
-import grakn.common.poc.reasoning.execution.Plan;
 import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
@@ -37,29 +36,27 @@ public class Atomic extends ExecutionActor<Atomic> {
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        Plan responsePlan = respondingPlan(fromUpstream);
-
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, self(), answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+                    new Response.Answer(fromUpstream, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (responseProducer.hasReadyDownstreamRequest()) {
             return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
-            return Either.second(new Response.Exhausted(fromUpstream, responsePlan, self()));
+            return Either.second(new Response.Exhausted(fromUpstream));
         }
     }
 
     @Override
-    public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
-        Plan forwardingPlan = forwardingPlan(fromDownstream);
+    public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
+                                                   ResponseProducer responseProducer) {
 
         // TODO fix accessing actor state directly
-        if (answerSource(fromDownstream).state instanceof Atomic) {
+        if (fromDownstream.sourceRequest().receiver().state instanceof Atomic) {
             registerTraversal(responseProducer, fromDownstream.partialAnswer());
             RuleTrigger trigger = new RuleTrigger(fromDownstream.partialAnswer(), fromDownstream.constraints());
             if (!triggered.contains(trigger)) {
-                registerDownstreamRules(responseProducer, fromDownstream.plan(), fromDownstream.partialAnswer(),
+                registerDownstreamRules(responseProducer, fromDownstream.partialAnswer(),
                         fromDownstream.constraints(), fromDownstream.unifiers());
                 triggered.add(trigger);
             }
@@ -67,57 +64,45 @@ public class Atomic extends ExecutionActor<Atomic> {
             if (responseProducer.getOneTraversalProducer() != null) {
                 List<Long> answers = produceTraversalAnswer(responseProducer);
                 return Either.second(
-                        new Response.Answer(fromUpstream, forwardingPlan, self(), answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+                        new Response.Answer(fromUpstream, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
             } else if (responseProducer.hasReadyDownstreamRequest()) {
                 return Either.first(responseProducer.getReadyDownstreamRequest());
             } else {
-                return Either.second(new Response.Exhausted(fromUpstream, forwardingPlan, self()));
+                return Either.second(new Response.Exhausted(fromUpstream));
             }
-        } else if (answerSource(fromDownstream).state instanceof Rule) {
+        } else if (fromDownstream.sourceRequest().receiver().state instanceof Rule) {
             // TODO may combine with partial answers from the fromUpstream message
-            return Either.second(
-                    new Response.Answer(fromUpstream, forwardingPlan, self(), fromDownstream.partialAnswer(),
-                            fromUpstream.constraints(), fromUpstream.unifiers()));
+            return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
+                    fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             throw new RuntimeException("Unhandled downstream actor of type " +
-                    answerSource(fromDownstream).state.getClass().getSimpleName());
+                    fromDownstream.sourceRequest().receiver().state.getClass().getSimpleName());
         }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
-        Plan responsePlan = respondingPlan(fromUpstream);
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answer = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, self(), answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (responseProducer.hasReadyDownstreamRequest()) {
             return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
-            return Either.second(new Response.Exhausted(fromUpstream, responsePlan, self()));
+            return Either.second(new Response.Exhausted(fromUpstream));
         }
     }
 
     @Override
     protected ResponseProducer createResponseProducer(final Request request) {
-
         ResponseProducer responseProducer = new ResponseProducer();
 
-        boolean hasDownstream = request.plan().nextStep() != null;
-        if (hasDownstream) {
-            Plan nextStep = request.plan().toNextStep();
-            Request toDownstream = new Request(nextStep, request.partialAnswer(), request.constraints(), request.unifiers());
-            responseProducer.addReadyDownstream(toDownstream);
-        } else {
-            registerTraversal(responseProducer, request.partialAnswer());
-            RuleTrigger trigger = new RuleTrigger(request.partialAnswer(), request.constraints());
-            if (!triggered.contains(trigger)) {
-                registerDownstreamRules(responseProducer, request.plan(), request.partialAnswer(),
-                        request.constraints(), request.unifiers());
-                triggered.add(trigger);
-            }
-
+        registerTraversal(responseProducer, request.partialAnswer());
+        RuleTrigger trigger = new RuleTrigger(request.partialAnswer(), request.constraints());
+        if (!triggered.contains(trigger)) {
+            registerDownstreamRules(responseProducer, request.partialAnswer(), request.constraints(), request.unifiers());
+            triggered.add(trigger);
         }
         return responseProducer;
     }
@@ -125,15 +110,13 @@ public class Atomic extends ExecutionActor<Atomic> {
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
         for (List<Long> rule : rules) {
-            Actor<Rule> ruleActor = registry.registerRule(rule, pattern ->
-                    child(actor -> new Rule(actor, pattern, 1L)));
+            Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> child(actor -> new Rule(actor, pattern, 1L)));
             ruleActors.add(ruleActor);
         }
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
         Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        // TODO could do batch traverse, or retrieve answers from multiple traversals
         Long answer = traversalProducer.next();
         if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
         answer += this.traversalPattern;
@@ -146,26 +129,13 @@ public class Atomic extends ExecutionActor<Atomic> {
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
     }
 
-    private void registerDownstreamRules(final ResponseProducer responseProducer, final Plan basePlan, final List<Long> partialAnswers,
+    private void registerDownstreamRules(final ResponseProducer responseProducer, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActors) {
-            Request toDownstream = new Request(ruleActor, null, partialAnswers, constraints, unifiers);
+            Request toDownstream = new Request(self(), ruleActor, partialAnswers, constraints, unifiers);
             responseProducer.addReadyDownstream(toDownstream);
         }
     }
-
-    private Actor<? extends ExecutionActor<?>> answerSource(final Response.Answer answer) {
-        return answer.sourceRequest().plan().currentStep();
-    }
-
-    private Plan respondingPlan(final Request fromUpstream) {
-        return fromUpstream.plan().truncate().endStepCompleted();
-    }
-
-    private Plan forwardingPlan(final Response.Answer fromDownstream) {
-        return fromDownstream.plan().endStepCompleted();
-    }
-
 
     private static class RuleTrigger {
         private final List<Long> partialAnswer;

@@ -7,7 +7,6 @@ import grakn.common.poc.reasoning.Registry;
 import grakn.common.poc.reasoning.Atomic;
 import grakn.common.poc.reasoning.Conjunction;
 import grakn.common.poc.reasoning.Rule;
-import grakn.common.poc.reasoning.execution.Plan;
 import grakn.common.poc.reasoning.execution.Request;
 import org.junit.Test;
 
@@ -45,7 +44,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -90,7 +89,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -135,7 +134,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -179,7 +178,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -227,7 +226,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -276,7 +275,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -333,7 +332,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -365,7 +364,7 @@ public class ReasoningTest {
         Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
         conjunctive.tell(actor ->
                 actor.executeReceiveRequest(
-                        new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                        new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                         registry
                 )
         );
@@ -390,7 +389,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );

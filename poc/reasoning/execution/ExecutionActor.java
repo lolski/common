@@ -96,13 +96,13 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         LOG.debug(name + ": requesting from downstream");
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
-        Actor<? extends ExecutionActor<?>> targetActor = request.plan().currentStep();
-        targetActor.tell(actor -> actor.executeReceiveRequest(request, registry));
+        Actor<? extends ExecutionActor<?>> receiver = request.receiver();
+        receiver.tell(actor -> actor.executeReceiveRequest(request, registry));
     }
 
     private void respondToUpstream(final Response response, final ResponseProducer responseProducer, final Registry registry) {
-        Actor<? extends ExecutionActor<?>> targetActor = response.plan().currentStep();
-        if (targetActor == null) {
+        Actor<? extends ExecutionActor<?>> receiver = response.sourceRequest().sender();
+        if (receiver == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             if (response.isAnswer()) {
                 Long mergedAnswer = response.asAnswer().partialAnswer().stream().reduce(0L, (acc, val) -> acc + val);
@@ -115,10 +115,10 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         } else {
             if (response.isAnswer()) {
                 LOG.debug(name + ": Responding to upstream with an Answer");
-                targetActor.tell(actor -> actor.executeReceiveAnswer(response.asAnswer(), registry));
+                receiver.tell(actor -> actor.executeReceiveAnswer(response.asAnswer(), registry));
             } else if (response.isExhausted()) {
                 LOG.debug(name + ": Responding to upstream with an Exhausted");
-                targetActor.tell(actor -> actor.executeReceiveExhausted(response.asExhausted(), registry));
+                receiver.tell(actor -> actor.executeReceiveExhausted(response.asExhausted(), registry));
             } else {
                 throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));
             }

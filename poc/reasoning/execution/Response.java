@@ -6,8 +6,6 @@ import java.util.List;
 
 public interface Response {
     Request sourceRequest();
-    Plan plan();
-    Actor<? extends ExecutionActor<?>> downstream();
 
     boolean isAnswer();
     boolean isExhausted();
@@ -22,21 +20,15 @@ public interface Response {
 
     class Answer implements Response {
         private final Request sourceRequest;
-        private final Plan plan;
-        private final Actor<? extends ExecutionActor<?>>  downstream;
         private final List<Long> partialAnswer;
         private final List<Object> constraints;
         private final List<Object> unifiers;
 
         public Answer(final Request sourceRequest,
-                      final Plan plan,
-                      final Actor<? extends ExecutionActor<?>> downstream,
                       final List<Long> partialAnswer,
                       final List<Object> constraints,
                       final List<Object> unifiers) {
             this.sourceRequest = sourceRequest;
-            this.plan = plan;
-            this.downstream = downstream;
             this.partialAnswer = partialAnswer;
             this.constraints = constraints;
             this.unifiers = unifiers;
@@ -45,14 +37,6 @@ public interface Response {
         @Override
         public Request sourceRequest() {
             return sourceRequest;
-        }
-
-        @Override
-        public Plan plan() { return plan; }
-
-        @Override
-        public Actor<? extends ExecutionActor<?>>  downstream() {
-            return downstream;
         }
 
         public List<Long> partialAnswer() {
@@ -81,26 +65,14 @@ public interface Response {
 
     class Exhausted implements Response {
         private final Request sourceRequest;
-        final Plan plan;
-        private Actor<? extends ExecutionActor<?>>  downstream;
 
-        public Exhausted(final Request sourceRequest, final Plan plan, final Actor<? extends ExecutionActor<?>>  downstream) {
+        public Exhausted(final Request sourceRequest) {
             this.sourceRequest = sourceRequest;
-            this.plan = plan;
-            this.downstream = downstream;
         }
 
         @Override
         public Request sourceRequest() {
             return sourceRequest;
-        }
-
-        @Override
-        public Plan plan() { return plan; }
-
-        @Override
-        public Actor<? extends ExecutionActor<?>>  downstream() {
-            return downstream;
         }
 
         @Override

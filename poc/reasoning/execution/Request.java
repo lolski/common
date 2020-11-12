@@ -7,18 +7,19 @@ import java.util.List;
 import java.util.Objects;
 
 public class Request {
-    private final Plan plan;
-
+    private Actor<? extends ExecutionActor<?>> sender;
+    private Actor<? extends ExecutionActor<?>> receiver;
     private final List<Long> partialAnswer;
     private final List<Object> constraints;
     private final List<Object> unifiers;
 
-    public Request(Actor<? extends ExecutionActor<?>> downstream,
-                   Plan plan,
+    public Request(Actor<? extends ExecutionActor<?>> sender,
+                   Actor<? extends ExecutionActor<?>> receiver,
                    List<Long> partialAnswer,
                    List<Object> constraints,
                    List<Object> unifiers) {
-        this.plan = plan;
+        this.sender = sender;
+        this.receiver = receiver;
         this.partialAnswer = partialAnswer;
         this.constraints = constraints;
         this.unifiers = unifiers;
@@ -29,7 +30,7 @@ public class Request {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Request request = (Request) o;
-        return Objects.equals(plan, request.plan) &&
+        return Objects.equals(receiver, request.receiver) &&
                 Objects.equals(partialAnswer, request.partialAnswer()) &&
                 Objects.equals(constraints, request.constraints()) &&
                 Objects.equals(unifiers, request.unifiers());
@@ -37,11 +38,16 @@ public class Request {
 
     @Override
     public int hashCode() {
-        return Objects.hash(plan, partialAnswer, constraints, unifiers);
+        return Objects.hash(receiver, partialAnswer, constraints, unifiers);
     }
 
-    public Plan plan() { return plan; }
+    public Actor<? extends ExecutionActor<?>> sender() {
+        return sender;
+    }
 
+    public Actor<? extends ExecutionActor<?>> receiver() {
+        return receiver;
+    }
 
     public List<Long> partialAnswer() {
         return partialAnswer;
