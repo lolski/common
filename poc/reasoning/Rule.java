@@ -63,6 +63,7 @@ public class Rule extends ExecutionActor<Rule> {
         // every rule has exactly 1 downstream, so an exhausted message must indicate the downstream is exhausted
         responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
         Plan responsePlan = respondingPlan(fromUpstream);
+
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
             return Either.second(
