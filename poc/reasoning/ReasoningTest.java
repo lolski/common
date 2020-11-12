@@ -220,7 +220,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (1*1) + (1*2) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
+        long n = 0L + (1 * 1) + (1 * 2) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
@@ -269,7 +269,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (4L*4L*4L) + 1;
+        long n = 0L + (4L * 4L * 4L) + 1;
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
@@ -326,7 +326,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (10L*10L*10L*10L*10L) + 1;
+        long n = 0L + (10L * 10L * 10L * 10L * 10L) + 1;
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
@@ -399,4 +399,5 @@ public class ReasoningTest {
         assertEquals(responses.take().longValue(), -1L);
         assertTrue(responses.isEmpty());
     }
+
 }
