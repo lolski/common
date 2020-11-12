@@ -17,7 +17,7 @@
 
 java_test(
     name = "reasoning-test",
-    test_class = "grakn.common.poc.reasoning.ReasoningTest",
+    test_class = "grakn.common.poc.reasoning.test.ReasoningTest",
     srcs = ["ReasoningTest.java"],
     deps = [
         "//poc/reasoning",
@@ -29,5 +29,5 @@ java_test(
     resources = [
         "logback.xml"
     ],
-    resource_strip_prefix = "poc/reasoning"
+    resource_strip_prefix = "poc/reasoning/test"
 )

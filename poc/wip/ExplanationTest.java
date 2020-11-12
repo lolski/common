@@ -4,7 +4,7 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import grakn.common.poc.reasoning.Registry;
-import grakn.common.poc.reasoning.Atomic;
+import grakn.common.poc.reasoning.Inferrable;
 import grakn.common.poc.reasoning.Rule;
 import org.junit.Test;
 
@@ -41,7 +41,7 @@ public class ExplanationTest {
         // create atomic actors first to control answer size
         registry.registerAtomic(10L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
+                        actor.<Inferrable>createActor(self -> new Inferrable(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         registry.registerRule(list(10L), pattern ->
@@ -51,7 +51,7 @@ public class ExplanationTest {
         );
         registry.registerAtomic(2010L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 0L, Arrays.asList(Arrays.asList(10L))))
+                        actor.<Inferrable>createActor(self -> new Inferrable(self, pattern, 0L, Arrays.asList(Arrays.asList(10L))))
                 ).awaitUnchecked()
         );
 //        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->

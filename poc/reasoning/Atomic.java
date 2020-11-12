@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+// TODO settle on a name
 public class Atomic extends ExecutionActor<Atomic> {
 
     private final Long traversalPattern;
