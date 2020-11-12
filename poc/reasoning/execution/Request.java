@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution;
 
 
 import java.util.List;
@@ -6,9 +6,10 @@ import java.util.Objects;
 
 public class Request {
     private final Plan plan;
-    final List<Long> partialAnswer;
-    final List<Object> constraints;
-    final List<Object> unifiers;
+
+    private final List<Long> partialAnswer;
+    private final List<Object> constraints;
+    private final List<Object> unifiers;
 
     public Request(Plan plan,
                    List<Long> partialAnswer,
@@ -26,9 +27,9 @@ public class Request {
         if (o == null || getClass() != o.getClass()) return false;
         Request request = (Request) o;
         return Objects.equals(plan, request.plan) &&
-                Objects.equals(partialAnswer, request.partialAnswer) &&
-                Objects.equals(constraints, request.constraints) &&
-                Objects.equals(unifiers, request.unifiers);
+                Objects.equals(partialAnswer, request.partialAnswer()) &&
+                Objects.equals(constraints, request.constraints()) &&
+                Objects.equals(unifiers, request.unifiers());
     }
 
     @Override
@@ -37,4 +38,18 @@ public class Request {
     }
 
     public Plan plan() { return plan; }
+
+
+    public List<Long> partialAnswer() {
+        return partialAnswer;
+    }
+
+    public List<Object> constraints() {
+        return constraints;
+    }
+
+    public List<Object> unifiers() {
+        return unifiers;
+    }
+
 }

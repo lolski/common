@@ -1,8 +1,8 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution;
 
 import java.util.List;
 
-interface Response {
+public interface Response {
     Request sourceRequest();
     Plan plan();
 
@@ -19,10 +19,10 @@ interface Response {
 
     class Answer implements Response {
         private final Request sourceRequest;
-        final Plan plan;
-        final List<Long> partialAnswer;
-        final List<Object> constraints;
-        final List<Object> unifiers;
+        private final Plan plan;
+        private final List<Long> partialAnswer;
+        private final List<Object> constraints;
+        private final List<Object> unifiers;
 
         public Answer(final Request sourceRequest,
                       final Plan plan,
@@ -43,6 +43,18 @@ interface Response {
 
         @Override
         public Plan plan() { return plan; }
+
+        public List<Long> partialAnswer() {
+            return partialAnswer;
+        }
+
+        public List<Object> constraints() {
+            return constraints;
+        }
+
+        public List<Object> unifiers() {
+            return unifiers;
+        }
 
         @Override
         public boolean isAnswer() { return true; }

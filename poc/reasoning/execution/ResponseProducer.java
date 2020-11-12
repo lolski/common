@@ -1,11 +1,11 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-class ResponseProducer {
+public class ResponseProducer {
     private final List<Request> downstreamsAvailable;
     private List<Iterator<Long>> traversalProducers;
 

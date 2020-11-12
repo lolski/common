@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution;
 
 
 import grakn.common.concurrent.actor.Actor;
@@ -20,11 +20,11 @@ public class Plan {
         this.plan = new ArrayList<>(plan);
     }
 
-    boolean atEnd() {
+    public boolean atEnd() {
         return current == plan.size() - 1;
     }
 
-    boolean isEmpty() {
+    public boolean isEmpty() {
         boolean isEmpty = plan.size() == 0;
         if (isEmpty) {
             assert current == NOT_STARTED : "An empty plan's current position must be -1";
@@ -32,14 +32,14 @@ public class Plan {
         return isEmpty;
     }
 
-    Plan toNextStep() {
+    public Plan toNextStep() {
         Plan plan = new Plan(this.plan);
         plan.current = this.current + 1;
         assert plan.current < plan.plan.size() : "Trying to move past the last step of the plan";
         return plan;
     }
 
-    Plan endStepCompleted() {
+    public Plan endStepCompleted() {
         assert current != NOT_STARTED;
         assert current == plan.size() - 1 : "Can only complete the end step if it is the last step of the plan";
 

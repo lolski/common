@@ -1,7 +1,8 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.ActorRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,11 +21,11 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
-    protected ExecutionActor(final Actor<T> self, final String name) {
+    public ExecutionActor(final Actor<T> self, final String name) {
         this(self, name, null);
     }
 
-    protected ExecutionActor(final Actor<T> self, final String name, LinkedBlockingQueue<Long> responses) {
+    public ExecutionActor(final Actor<T> self, final String name, LinkedBlockingQueue<Long> responses) {
         super(self);
         this.name = name;
         isInitialised = false;
@@ -33,21 +34,21 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         requestRouter = new HashMap<>();
     }
 
-    abstract ResponseProducer createResponseProducer(final Request fromUpstream);
+    protected abstract ResponseProducer createResponseProducer(final Request fromUpstream);
 
-    abstract void initialiseDownstreamActors(ActorRegistry actorRegistry);
+    protected abstract void initialiseDownstreamActors(ActorRegistry actorRegistry);
 
-    abstract Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer);
+    protected abstract Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer);
 
-    abstract Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer);
+    protected abstract Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer);
 
-    abstract Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer);
+    protected abstract Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer);
 
     /*
      *
      * Handlers for messages sent into the execution actor that are dispatched via the actor model.
      *
-     * */
+     */
     public void executeReceiveRequest(final Request fromUpstream, final ActorRegistry actorRegistry) {
         LOG.debug(name + ": Received a new Request from upstream");
         if (!isInitialised) {
@@ -104,7 +105,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         if (targetActor == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             if (response.isAnswer()) {
-                Long mergedAnswer = response.asAnswer().partialAnswer.stream().reduce(0L, (acc, val) -> acc + val);
+                Long mergedAnswer = response.asAnswer().partialAnswer().stream().reduce(0L, (acc, val) -> acc + val);
                 LOG.debug(name + ": Writing Answer to output queue");
                 responses.add(mergedAnswer);
             } else {

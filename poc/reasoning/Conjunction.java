@@ -2,6 +2,11 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.execution.ExecutionActor;
+import grakn.common.poc.reasoning.execution.Plan;
+import grakn.common.poc.reasoning.execution.Request;
+import grakn.common.poc.reasoning.execution.Response;
+import grakn.common.poc.reasoning.execution.ResponseProducer;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -40,7 +45,7 @@ public class Conjunction extends ExecutionActor<Conjunction> {
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (!responseProducer.downstreamsExhausted()) {
             return Either.first(responseProducer.getAvailableDownstream());
         } else {
@@ -51,9 +56,9 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
-        List<Long> newAnswer = fromDownstream.partialAnswer;
+        List<Long> newAnswer = fromDownstream.partialAnswer();
         return Either.second(
-                new Response.Answer(fromUpstream, forwardingPlan, newAnswer, fromUpstream.constraints, fromUpstream.unifiers));
+                new Response.Answer(fromUpstream, forwardingPlan, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
     }
 
     @Override
@@ -65,18 +70,18 @@ public class Conjunction extends ExecutionActor<Conjunction> {
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
         }
     }
 
     @Override
-    ResponseProducer createResponseProducer(final Request request) {
+    protected ResponseProducer createResponseProducer(final Request request) {
         ResponseProducer responseProducer = new ResponseProducer();
 
         Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
-        Request toDownstream = new Request(nextPlan, request.partialAnswer, request.constraints, request.unifiers);
+        Request toDownstream = new Request(nextPlan, request.partialAnswer(), request.constraints(), request.unifiers());
         responseProducer.addAvailableDownstream(toDownstream);
 
         Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
@@ -86,7 +91,7 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     }
 
     @Override
-    void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+    protected void initialiseDownstreamActors(ActorRegistry actorRegistry) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
         planned = Collections.unmodifiableList(planned);
@@ -111,7 +116,7 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     }
 
     private Plan forwardingPlan(final Response.Answer fromDownstream) {
-        return fromDownstream.plan.endStepCompleted();
+        return fromDownstream.plan().endStepCompleted();
     }
 
 }

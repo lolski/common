@@ -2,6 +2,11 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.execution.ExecutionActor;
+import grakn.common.poc.reasoning.execution.Plan;
+import grakn.common.poc.reasoning.execution.Request;
+import grakn.common.poc.reasoning.execution.Response;
+import grakn.common.poc.reasoning.execution.ResponseProducer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,7 +39,7 @@ public class Atomic extends ExecutionActor<Atomic> {
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (!responseProducer.downstreamsExhausted()) {
             return Either.first(responseProducer.getAvailableDownstream());
         } else {
@@ -48,18 +53,18 @@ public class Atomic extends ExecutionActor<Atomic> {
 
         // TODO fix accessing actor state directly
         if (answerSource(fromDownstream).state instanceof Atomic) {
-            registerTraversal(responseProducer, fromDownstream.partialAnswer);
-            RuleTrigger trigger = new RuleTrigger(fromDownstream.partialAnswer, fromDownstream.constraints);
+            registerTraversal(responseProducer, fromDownstream.partialAnswer());
+            RuleTrigger trigger = new RuleTrigger(fromDownstream.partialAnswer(), fromDownstream.constraints());
             if (!triggered.contains(trigger)) {
-                registerDownstreamRules(responseProducer, fromDownstream.plan, fromDownstream.partialAnswer,
-                        fromDownstream.constraints, fromDownstream.unifiers);
+                registerDownstreamRules(responseProducer, fromDownstream.plan(), fromDownstream.partialAnswer(),
+                        fromDownstream.constraints(), fromDownstream.unifiers());
                 triggered.add(trigger);
             }
 
             if (responseProducer.getOneTraversalProducer() != null) {
                 List<Long> answers = produceTraversalAnswer(responseProducer);
                 return Either.second(
-                        new Response.Answer(fromUpstream, forwardingPlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+                        new Response.Answer(fromUpstream, forwardingPlan, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
             } else if (!responseProducer.downstreamsExhausted()) {
                 return Either.first(responseProducer.getAvailableDownstream());
             } else {
@@ -68,8 +73,8 @@ public class Atomic extends ExecutionActor<Atomic> {
         } else if (answerSource(fromDownstream).state instanceof Rule) {
             // TODO may combine with partial answers from the fromUpstream message
             return Either.second(
-                    new Response.Answer(fromUpstream, forwardingPlan, fromDownstream.partialAnswer,
-                            fromUpstream.constraints, fromUpstream.unifiers));
+                    new Response.Answer(fromUpstream, forwardingPlan, fromDownstream.partialAnswer(),
+                            fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             throw new RuntimeException("Unhandled downstream actor of type " +
                     answerSource(fromDownstream).state.getClass().getSimpleName());
@@ -83,7 +88,7 @@ public class Atomic extends ExecutionActor<Atomic> {
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answer = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, answer, fromUpstream.constraints, fromUpstream.unifiers));
+                    new Response.Answer(fromUpstream, responsePlan, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (!responseProducer.downstreamsExhausted()) {
             return Either.first(responseProducer.getAvailableDownstream());
         } else {
@@ -92,21 +97,21 @@ public class Atomic extends ExecutionActor<Atomic> {
     }
 
     @Override
-    ResponseProducer createResponseProducer(final Request request) {
+    protected ResponseProducer createResponseProducer(final Request request) {
 
         ResponseProducer responseProducer = new ResponseProducer();
 
         boolean hasDownstream = request.plan().nextStep() != null;
         if (hasDownstream) {
             Plan nextStep = request.plan().toNextStep();
-            Request toDownstream = new Request(nextStep, request.partialAnswer, request.constraints, request.unifiers);
+            Request toDownstream = new Request(nextStep, request.partialAnswer(), request.constraints(), request.unifiers());
             responseProducer.addAvailableDownstream(toDownstream);
         } else {
-            registerTraversal(responseProducer, request.partialAnswer);
-            RuleTrigger trigger = new RuleTrigger(request.partialAnswer, request.constraints);
+            registerTraversal(responseProducer, request.partialAnswer());
+            RuleTrigger trigger = new RuleTrigger(request.partialAnswer(), request.constraints());
             if (!triggered.contains(trigger)) {
-                registerDownstreamRules(responseProducer, request.plan(), request.partialAnswer,
-                        request.constraints, request.unifiers);
+                registerDownstreamRules(responseProducer, request.plan(), request.partialAnswer(),
+                        request.constraints(), request.unifiers());
                 triggered.add(trigger);
             }
 
@@ -115,7 +120,7 @@ public class Atomic extends ExecutionActor<Atomic> {
     }
 
     @Override
-    void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+    protected void initialiseDownstreamActors(ActorRegistry actorRegistry) {
         for (List<Long> rule : rules) {
             Actor<Rule> ruleActor = actorRegistry.registerRule(rule, pattern ->
                     child(actor -> new Rule(actor, pattern, 1L)));

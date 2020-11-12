@@ -3,6 +3,8 @@ package grakn.common.poc.reasoning;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
+import grakn.common.poc.reasoning.execution.Plan;
+import grakn.common.poc.reasoning.execution.Request;
 import org.junit.Test;
 
 import java.util.ArrayList;
