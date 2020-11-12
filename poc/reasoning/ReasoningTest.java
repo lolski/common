@@ -1,16 +1,13 @@
 package grakn.common.poc.reasoning;
 
-import grakn.common.collection.Collections;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.list;
@@ -29,11 +26,11 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(0L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 5L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 5L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(0L), 5L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(0L), 5L, responses))
         ).awaitUnchecked();
 
 
@@ -69,16 +66,16 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 2L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 2L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(20L, 2L), 0L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
 
@@ -114,16 +111,16 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 2L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 0L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 0L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(20L, 2L), 0L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
 
@@ -159,16 +156,16 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(-2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(2L), 0L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -200,23 +197,23 @@ public class ReasoningTest {
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        Actor<AtomicActor> bottomAtomic = actorRegistry.registerAtomic(-2L, pattern ->
+        Actor<Atomic> bottomAtomic = actorRegistry.registerAtomic(-2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<AtomicActor> atomicWithRule = actorRegistry.registerAtomic(2L, pattern ->
+        Actor<Atomic> atomicWithRule = actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
                 ).awaitUnchecked()
         );
-        Actor<AtomicActor> atomicWithoutRule = actorRegistry.registerAtomic(20L, pattern ->
+        Actor<Atomic> atomicWithoutRule = actorRegistry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(20L, 2L), 0L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -251,21 +248,21 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 4L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 4L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(200L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 4L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(200L, 20L, 2L), 0L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(200L, 20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -298,31 +295,31 @@ public class ReasoningTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 10L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 10L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(200L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 10L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(2000L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 10L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(20000L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 10L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
-                actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L, responses))
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(20000L, 2000L, 200L, 20L, 2L), 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -357,9 +354,9 @@ public class ReasoningTest {
         }
         long start = System.currentTimeMillis();
         actorRegistry.registerAtomic(1L, pattern ->
-                rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, rules))).awaitUnchecked()
+                rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, rules))).awaitUnchecked()
         );
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor -> actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
+        Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
         conjunctive.tell(actor ->
                 actor.executeReceiveRequest(
                         new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
@@ -379,9 +376,9 @@ public class ReasoningTest {
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // conjunction1 -> atomic1 -> rule1 -> conjunction2 -> atomic1
-        actorRegistry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<RuleActor>createActor(self -> new RuleActor(self, pattern, 1L))).awaitUnchecked());
-        actorRegistry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
-        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor -> actor.<ConjunctiveActor>createActor(self -> new ConjunctiveActor(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
+        actorRegistry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))).awaitUnchecked());
+        actorRegistry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
+        Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
 
         long n = 0L + 1L + 1L + 1L + 1;
         for (int i = 0; i < n; i++) {

@@ -10,16 +10,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-public class AtomicActor extends ExecutionActor<AtomicActor> {
+public class Atomic extends ExecutionActor<Atomic> {
 
     private final Long traversalPattern;
     private final long traversalSize;
     private final List<List<Long>> rules;
-    private List<Actor<RuleActor>> ruleActors;
+    private List<Actor<Rule>> ruleActors;
     private Set<RuleTrigger> triggered;
 
-    public AtomicActor(final Actor<AtomicActor> self, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
-        super(self, AtomicActor.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
+    public Atomic(final Actor<Atomic> self, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
+        super(self, Atomic.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
         this.rules = rules;
@@ -47,7 +47,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
 
         // TODO fix accessing actor state directly
-        if (answerSource(fromDownstream).state instanceof AtomicActor) {
+        if (answerSource(fromDownstream).state instanceof Atomic) {
             registerTraversal(responseProducer, fromDownstream.partialAnswer);
             RuleTrigger trigger = new RuleTrigger(fromDownstream.partialAnswer, fromDownstream.constraints);
             if (!triggered.contains(trigger)) {
@@ -65,7 +65,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
             } else {
                 return Either.second(new Response.Exhausted(fromUpstream, forwardingPlan));
             }
-        } else if (answerSource(fromDownstream).state instanceof RuleActor) {
+        } else if (answerSource(fromDownstream).state instanceof Rule) {
             // TODO may combine with partial answers from the fromUpstream message
             return Either.second(
                     new Response.Answer(fromUpstream, forwardingPlan, fromDownstream.partialAnswer,
@@ -117,8 +117,8 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
     @Override
     void initialiseDownstreamActors(ActorRegistry actorRegistry) {
         for (List<Long> rule : rules) {
-            Actor<RuleActor> ruleActor = actorRegistry.registerRule(rule, pattern ->
-                    child(actor -> new RuleActor(actor, pattern, 1L)));
+            Actor<Rule> ruleActor = actorRegistry.registerRule(rule, pattern ->
+                    child(actor -> new Rule(actor, pattern, 1L)));
             ruleActors.add(ruleActor);
         }
     }
@@ -140,7 +140,7 @@ public class AtomicActor extends ExecutionActor<AtomicActor> {
 
     private void registerDownstreamRules(final ResponseProducer responseProducer, final Plan basePlan, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
-        for (Actor<RuleActor> ruleActor : ruleActors) {
+        for (Actor<Rule> ruleActor : ruleActors) {
             Plan toRule = basePlan.addStep(ruleActor).toNextStep();
             Request toDownstream = new Request(toRule, partialAnswers, constraints, unifiers);
             responseProducer.addAvailableDownstream(toDownstream);

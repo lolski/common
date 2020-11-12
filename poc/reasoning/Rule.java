@@ -5,14 +5,14 @@ import grakn.common.concurrent.actor.Actor;
 
 import java.util.List;
 
-public class RuleActor extends ExecutionActor<RuleActor> {
+public class Rule extends ExecutionActor<Rule> {
     private final List<Long> when;
     private final Long whenTraversalSize;
-    private Actor<ConjunctiveActor> whenActor = null;
+    private Actor<Conjunction> whenActor = null;
 
-    public RuleActor(final Actor<RuleActor> self, final List<Long> when,
-                     final Long whenTraversalSize) {
-        super(self, RuleActor.class.getSimpleName() + "(pattern:" + when + ")");
+    public Rule(final Actor<Rule> self, final List<Long> when,
+                final Long whenTraversalSize) {
+        super(self, Rule.class.getSimpleName() + "(pattern:" + when + ")");
         this.when = when;
         this.whenTraversalSize = whenTraversalSize;
     }
@@ -65,7 +65,7 @@ public class RuleActor extends ExecutionActor<RuleActor> {
 
     @Override
     void initialiseDownstreamActors(ActorRegistry actorRegistry) {
-        whenActor = child((newActor) -> new ConjunctiveActor(newActor, when, whenTraversalSize));
+        whenActor = child((newActor) -> new Conjunction(newActor, when, whenTraversalSize));
     }
 
     private Plan respondingPlan(final Request fromUpstream) {

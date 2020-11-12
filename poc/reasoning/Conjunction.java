@@ -11,20 +11,20 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
+public class Conjunction extends ExecutionActor<Conjunction> {
     private final Long traversalSize;
     @Nullable
     private final List<Long> conjunction;
-    private List<Actor<AtomicActor>> plannedAtomics;
+    private List<Actor<Atomic>> plannedAtomics;
 
-    ConjunctiveActor(final Actor<ConjunctiveActor> self, final List<Long> conjunction,
-                               final Long traversalSize) {
+    Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
+                final Long traversalSize) {
         this(self, conjunction, traversalSize, null);
     }
 
-    ConjunctiveActor(final Actor<ConjunctiveActor> self, final List<Long> conjunction,
-                               final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
-        super(self, ConjunctiveActor.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
+    Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
+                final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
+        super(self, Conjunction.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
@@ -92,8 +92,8 @@ public class ConjunctiveActor extends ExecutionActor<ConjunctiveActor> {
         planned = Collections.unmodifiableList(planned);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
-            Actor<AtomicActor> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
-                    child((newActor) -> new AtomicActor(newActor, pattern, 5L, Arrays.asList())));
+            Actor<Atomic> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
+                    child((newActor) -> new Atomic(newActor, pattern, 5L, Arrays.asList())));
             plannedAtomics.add(atomicActor);
         }
     }

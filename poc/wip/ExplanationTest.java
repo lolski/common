@@ -4,11 +4,8 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import grakn.common.poc.reasoning.ActorRegistry;
-import grakn.common.poc.reasoning.AtomicActor;
-import grakn.common.poc.reasoning.ConjunctiveActor;
-import grakn.common.poc.reasoning.Plan;
-import grakn.common.poc.reasoning.Request;
-import grakn.common.poc.reasoning.RuleActor;
+import grakn.common.poc.reasoning.Atomic;
+import grakn.common.poc.reasoning.Rule;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -44,17 +41,17 @@ public class ExplanationTest {
         // create atomic actors first to control answer size
         actorRegistry.registerAtomic(10L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 1L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         actorRegistry.registerRule(list(10L), pattern ->
                 rootActor.ask(actor ->
-                        actor.<RuleActor>createActor(self -> new RuleActor(self, pattern, 0L))
+                        actor.<Rule>createActor(self -> new Rule(self, pattern, 0L))
                 ).awaitUnchecked()
         );
         actorRegistry.registerAtomic(2010L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<AtomicActor>createActor(self -> new AtomicActor(self, pattern, 0L, Arrays.asList(Arrays.asList(10L))))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 0L, Arrays.asList(Arrays.asList(10L))))
                 ).awaitUnchecked()
         );
 //        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
