@@ -51,6 +51,7 @@ public class Atomic extends ExecutionActor<Atomic> {
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
 
+        // TODO: deduplicate answer: if the answer that you want to send up is already sent before, retry or send done if all downstreams are exhausted
         // TODO fix accessing actor state directly
         if (fromDownstream.sourceRequest().receiver().state instanceof Atomic) {
             registerTraversal(responseProducer, fromDownstream.partialAnswer());

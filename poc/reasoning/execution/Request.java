@@ -25,22 +25,6 @@ public class Request {
         this.unifiers = unifiers;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Request request = (Request) o;
-        return Objects.equals(receiver, request.receiver) &&
-                Objects.equals(partialAnswer, request.partialAnswer()) &&
-                Objects.equals(constraints, request.constraints()) &&
-                Objects.equals(unifiers, request.unifiers());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(receiver, partialAnswer, constraints, unifiers);
-    }
-
     public Actor<? extends ExecutionActor<?>> sender() {
         return sender;
     }
@@ -61,4 +45,24 @@ public class Request {
         return unifiers;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Request request = (Request) o;
+        return Objects.equals(receiver, request.receiver) &&
+                Objects.equals(partialAnswer, request.partialAnswer()) &&
+                Objects.equals(constraints, request.constraints()) &&
+                Objects.equals(unifiers, request.unifiers());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(receiver, partialAnswer, constraints, unifiers);
+    }
+
+    @Override
+    public String toString() {
+        return "Req(send=" + (sender == null ? "<none>" : sender.state.name) + ", pAns=" + partialAnswer + ")";
+    }
 }

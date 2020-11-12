@@ -47,34 +47,30 @@ public class Rule extends ExecutionActor<Rule> {
         if (isLast(sender)) {
 
             // TODO unify and materialise
-
+            // TODO: deduplicate answer: if the answer that you want to send up is already sent before, retry or send done if all downstreams are exhausted
             List<Long> newAnswer = fromDownstream.partialAnswer();
             return Either.second(
                     new Response.Answer(fromUpstream, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(self(), nextPlannedDownstream, fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+            responseProducer.addReadyDownstream(downstreamRequest);
             return Either.first(downstreamRequest);
         }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
-        Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
+        responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
 
-        if (isFirst(sender)) {
-            // every rule has exactly 1 ready downstream, so an exhausted message must indicate the downstream is exhausted
-            responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
-
-            if (responseProducer.getOneTraversalProducer() != null) {
-                List<Long> answers = produceTraversalAnswer(responseProducer);
-                return Either.second(
-                        new Response.Answer(fromUpstream,answers, fromUpstream.constraints(), fromUpstream.unifiers()));
-            } else {
-                return Either.second(new Response.Exhausted(fromUpstream));
-            }
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswer(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+        } else if (responseProducer.hasReadyDownstreamRequest()) {
+            return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
-            return Either.first(new Request(plannedAtomics.get(0), null, fromUpstream.partialAnswer(), fromUpstream.constraints(), fromUpstream.unifiers()));
+            return Either.second(new Response.Exhausted(fromUpstream));
         }
     }
 
@@ -82,10 +78,10 @@ public class Rule extends ExecutionActor<Rule> {
     protected ResponseProducer createResponseProducer(final Request request) {
         ResponseProducer responseProducer = new ResponseProducer();
 
-        Request toDownstream = new Request(plannedAtomics.get(0), null, request.partialAnswer(), request.constraints(), request.unifiers());
+        Request toDownstream = new Request(self(), plannedAtomics.get(0), request.partialAnswer(), request.constraints(), request.unifiers());
         responseProducer.addReadyDownstream(toDownstream);
 
-        Long startingAnswer = when.stream().reduce((acc, val) -> acc + val).get();
+        Long startingAnswer = when.stream().reduce((acc, val) -> acc + val).get() + -100;
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         return responseProducer;

@@ -50,14 +50,17 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
      *
      */
     public void executeReceiveRequest(final Request fromUpstream, final Registry registry) {
-        LOG.debug(name + ": Received a new Request from upstream");
+        LOG.debug(name + ": Received a new Request from upstream: " + fromUpstream);
         if (!isInitialised) {
             LOG.debug(name + ": initialising downstream actors");
             initialiseDownstreamActors(registry);
             isInitialised = true;
         }
 
-        ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> createResponseProducer(fromUpstream));
+        ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> {
+            LOG.debug(name + ": creating response producer for upstream: " + fromUpstream);
+            return createResponseProducer(fromUpstream);
+        });
         Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
         if (action.isFirst()) requestFromDownstream(action.first(), fromUpstream, responseProducer, registry);
         else respondToUpstream(action.second(), responseProducer, registry);

@@ -46,33 +46,30 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
         if (isLast(sender)) {
+            // TODO: deduplicate answer: if the answer that you want to send up is already sent before, retry or send done if all downstreams are exhausted
             List<Long> newAnswer = fromDownstream.partialAnswer();
             return Either.second(
                     new Response.Answer(fromUpstream, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
-            Request downstreamRequest = new Request(nextPlannedDownstream, null, fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+            Request downstreamRequest = new Request(self(), nextPlannedDownstream, fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+            responseProducer.addReadyDownstream(downstreamRequest);
             return Either.first(downstreamRequest);
         }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
-        Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
+        responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
 
-        if (isFirst(sender)) {
-            // every conjunction has exactly 1 ready downstream, so an exhausted message must indicate the downstream is exhausted
-            responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
-
-            if (responseProducer.getOneTraversalProducer() != null) {
-                List<Long> answers = produceTraversalAnswer(responseProducer);
-                return Either.second(
-                        new Response.Answer(fromUpstream,answers, fromUpstream.constraints(), fromUpstream.unifiers()));
-            } else {
-                return Either.second(new Response.Exhausted(fromUpstream));
-            }
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswer(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+        } else if (responseProducer.hasReadyDownstreamRequest()) {
+            return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
-            return Either.first(new Request(self(), plannedAtomics.get(0), fromUpstream.partialAnswer(), fromUpstream.constraints(), fromUpstream.unifiers()));
+            return Either.second(new Response.Exhausted(fromUpstream));
         }
     }
 
