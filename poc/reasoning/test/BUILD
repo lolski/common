@@ -15,18 +15,19 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-
-java_library(
-    name = "reasoning",
-    srcs = glob(["*.java", "execution/*.java"]),
+java_test(
+    name = "reasoning-test",
+    test_class = "grakn.common.poc.reasoning.ReasoningTest",
+    srcs = ["ReasoningTest.java"],
     deps = [
+        "//poc/reasoning",
         "//:common",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:org_slf4j_slf4j_api"
     ],
     runtime_deps = [
         "@maven//:ch_qos_logback_logback_classic",
     ],
-    visibility = ["//visibility:public"]
+    resources = [
+        "logback.xml"
+    ],
+    resource_strip_prefix = "poc/reasoning"
 )
-

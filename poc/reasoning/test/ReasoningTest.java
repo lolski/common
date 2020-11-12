@@ -1,8 +1,12 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.test;
 
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
+import grakn.common.poc.reasoning.ActorRegistry;
+import grakn.common.poc.reasoning.Atomic;
+import grakn.common.poc.reasoning.Conjunction;
+import grakn.common.poc.reasoning.Rule;
 import grakn.common.poc.reasoning.execution.Plan;
 import grakn.common.poc.reasoning.execution.Request;
 import org.junit.Test;

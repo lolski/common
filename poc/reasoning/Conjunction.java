@@ -27,7 +27,7 @@ public class Conjunction extends ExecutionActor<Conjunction> {
         this(self, conjunction, traversalSize, null);
     }
 
-    Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
+    public Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
                 final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
         super(self, Conjunction.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
 
