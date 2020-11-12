@@ -3,18 +3,23 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 public class Rule extends ExecutionActor<Rule> {
     private final List<Long> when;
-    private final Long whenTraversalSize;
-    private Actor<Conjunction> whenActor = null;
+    private final Long traversalSize;
+    private List<Actor<Atomic>> plannedAtomics;
 
     public Rule(final Actor<Rule> self, final List<Long> when,
-                final Long whenTraversalSize) {
+                final Long traversalSize) {
         super(self, Rule.class.getSimpleName() + "(pattern:" + when + ")");
         this.when = when;
-        this.whenTraversalSize = whenTraversalSize;
+        this.traversalSize = traversalSize;
+        this.plannedAtomics = new ArrayList<>();
     }
 
     @Override
@@ -23,49 +28,75 @@ public class Rule extends ExecutionActor<Rule> {
 
         Plan responsePlan = respondingPlan(fromUpstream);
 
-        if (!responseProducer.downstreamsExhausted()) {
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswer(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+        } else if (!responseProducer.downstreamsExhausted()) {
             return Either.first(responseProducer.getAvailableDownstream());
         } else {
             return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
         }
+
     }
 
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer) {
         Plan forwardingPlan = forwardingPlan(fromDownstream);
 
-        List<Long> newAnwser = fromDownstream.partialAnswer;
+        List<Long> newAnswer = fromDownstream.partialAnswer;
 
         // TODO unify and materialise
 
         return Either.second(
-                new Response.Answer(fromUpstream, forwardingPlan, newAnwser, fromUpstream.constraints, fromUpstream.unifiers));
+                new Response.Answer(fromUpstream, forwardingPlan, newAnswer, fromUpstream.constraints, fromUpstream.unifiers));
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
+        // every rule has exactly 1 downstream, so an exhausted message must indicate the downstream is exhausted
         responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
         Plan responsePlan = respondingPlan(fromUpstream);
-        return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
+        if (responseProducer.getOneTraversalProducer() != null) {
+            List<Long> answers = produceTraversalAnswer(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints, fromUpstream.unifiers));
+        } else {
+            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
+        }
     }
 
     @Override
     ResponseProducer createResponseProducer(final Request request) {
         ResponseProducer responseProducer = new ResponseProducer();
-        Plan nextStep = request.plan().addStep(whenActor).toNextStep();
-        Request toDownstream = new Request(
-                nextStep,
-                request.partialAnswer,
-                request.constraints,
-                request.unifiers
-        );
+        Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
+        Request toDownstream = new Request(nextPlan, request.partialAnswer, request.constraints, request.unifiers );
         responseProducer.addAvailableDownstream(toDownstream);
+
+        Long startingAnswer = when.stream().reduce((acc, val) -> acc + val).get();
+        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
+        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         return responseProducer;
     }
 
     @Override
     void initialiseDownstreamActors(ActorRegistry actorRegistry) {
-        whenActor = child((newActor) -> new Conjunction(newActor, when, whenTraversalSize));
+        List<Long> planned = new ArrayList<>(when);
+        Collections.reverse(planned);
+        planned = Collections.unmodifiableList(planned);
+        // in the future, we'll check if the atom is rule resolvable first
+        for (Long atomicPattern : planned) {
+            Actor<Atomic> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
+                    child((newActor) -> new Atomic(newActor, pattern, 5L, Arrays.asList())));
+            plannedAtomics.add(atomicActor);
+        }
+    }
+
+    private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
+        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
+        Long answer = traversalProducer.next();
+        if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
+        return Arrays.asList(answer);
     }
 
     private Plan respondingPlan(final Request fromUpstream) {
