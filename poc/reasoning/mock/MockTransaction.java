@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.mock;
 
 import java.util.Iterator;
 

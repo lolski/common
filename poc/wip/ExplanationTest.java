@@ -3,7 +3,7 @@ package grakn.common.poc.wip;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
-import grakn.common.poc.reasoning.ActorRegistry;
+import grakn.common.poc.reasoning.Registry;
 import grakn.common.poc.reasoning.Atomic;
 import grakn.common.poc.reasoning.Rule;
 import org.junit.Test;
@@ -32,24 +32,24 @@ public class ExplanationTest {
 
          */
 
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(10L, pattern ->
+        registry.registerAtomic(10L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerRule(list(10L), pattern ->
+        registry.registerRule(list(10L), pattern ->
                 rootActor.ask(actor ->
                         actor.<Rule>createActor(self -> new Rule(self, pattern, 0L))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(2010L, pattern ->
+        registry.registerAtomic(2010L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 0L, Arrays.asList(Arrays.asList(10L))))
                 ).awaitUnchecked()

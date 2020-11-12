@@ -7,12 +7,14 @@ import grakn.common.poc.reasoning.execution.Plan;
 import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
+import grakn.common.poc.reasoning.mock.MockTransaction;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class Atomic extends ExecutionActor<Atomic> {
@@ -120,9 +122,9 @@ public class Atomic extends ExecutionActor<Atomic> {
     }
 
     @Override
-    protected void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+    protected void initialiseDownstreamActors(Registry registry) {
         for (List<Long> rule : rules) {
-            Actor<Rule> ruleActor = actorRegistry.registerRule(rule, pattern ->
+            Actor<Rule> ruleActor = registry.registerRule(rule, pattern ->
                     child(actor -> new Rule(actor, pattern, 1L)));
             ruleActors.add(ruleActor);
         }
@@ -163,5 +165,31 @@ public class Atomic extends ExecutionActor<Atomic> {
     private Plan forwardingPlan(final Response.Answer fromDownstream) {
         return fromDownstream.plan().endStepCompleted();
     }
+
+
+    private static class RuleTrigger {
+        private final List<Long> partialAnswer;
+        private final List<Object> constraints;
+
+        public RuleTrigger(List<Long> partialAnswer, List<Object> constraints) {
+            this.partialAnswer = partialAnswer;
+            this.constraints = constraints;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            RuleTrigger that = (RuleTrigger) o;
+            return Objects.equals(partialAnswer, that.partialAnswer) &&
+                    Objects.equals(constraints, that.constraints);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(partialAnswer, constraints);
+        }
+    }
+
 }
 

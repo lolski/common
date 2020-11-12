@@ -6,11 +6,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
 
-public class ActorRegistry {
+public class Registry {
     private HashMap<Long, Actor<Atomic>> atomicActors;
     private HashMap<List<Long>, Actor<Rule>> ruleActors;
 
-    public ActorRegistry() {
+    public Registry() {
         this.atomicActors = new HashMap<>();
         this.ruleActors = new HashMap<>();
     }

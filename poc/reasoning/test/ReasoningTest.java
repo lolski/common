@@ -3,7 +3,7 @@ package grakn.common.poc.reasoning.test;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.ActorRoot;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
-import grakn.common.poc.reasoning.ActorRegistry;
+import grakn.common.poc.reasoning.Registry;
 import grakn.common.poc.reasoning.Atomic;
 import grakn.common.poc.reasoning.Conjunction;
 import grakn.common.poc.reasoning.Rule;
@@ -23,14 +23,14 @@ import static junit.framework.TestCase.assertTrue;
 public class ReasoningTest {
     @Test
     public void singleAtomicActor() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(0L, pattern ->
+        registry.registerAtomic(0L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 5L, Arrays.asList()))
                 ).awaitUnchecked()
@@ -46,7 +46,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
             Long answer = responses.take();
@@ -63,19 +63,19 @@ public class ReasoningTest {
 
     @Test
     public void doubleAtomicActor() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(2L, pattern ->
+        registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(20L, pattern ->
+        registry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
@@ -91,7 +91,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }
@@ -108,19 +108,19 @@ public class ReasoningTest {
 
     @Test
     public void filteringAtomicActor() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(2L, pattern ->
+        registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(20L, pattern ->
+        registry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 0L, Arrays.asList()))
                 ).awaitUnchecked()
@@ -136,7 +136,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }
@@ -153,19 +153,19 @@ public class ReasoningTest {
 
     @Test
     public void simpleRule() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(-2L, pattern ->
+        registry.registerAtomic(-2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(2L, pattern ->
+        registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
                 ).awaitUnchecked()
@@ -180,7 +180,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }
@@ -196,24 +196,24 @@ public class ReasoningTest {
 
     @Test
     public void atomicChainWithRule() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        Actor<Atomic> bottomAtomic = actorRegistry.registerAtomic(-2L, pattern ->
+        Actor<Atomic> bottomAtomic = registry.registerAtomic(-2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        Actor<Atomic> atomicWithRule = actorRegistry.registerAtomic(2L, pattern ->
+        Actor<Atomic> atomicWithRule = registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList(Arrays.asList(-2L))))
                 ).awaitUnchecked()
         );
-        Actor<Atomic> atomicWithoutRule = actorRegistry.registerAtomic(20L, pattern ->
+        Actor<Atomic> atomicWithoutRule = registry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
                 ).awaitUnchecked()
@@ -228,7 +228,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }
@@ -245,24 +245,24 @@ public class ReasoningTest {
 
     @Test
     public void shallowRerequest() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(2L, pattern ->
+        registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(20L, pattern ->
+        registry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(200L, pattern ->
+        registry.registerAtomic(200L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
                 ).awaitUnchecked()
@@ -277,7 +277,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }
@@ -292,34 +292,34 @@ public class ReasoningTest {
 
     @Test
     public void deepRerequest() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
 
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
-        actorRegistry.registerAtomic(2L, pattern ->
+        registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(20L, pattern ->
+        registry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(200L, pattern ->
+        registry.registerAtomic(200L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(2000L, pattern ->
+        registry.registerAtomic(2000L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
         );
-        actorRegistry.registerAtomic(20000L, pattern ->
+        registry.registerAtomic(20000L, pattern ->
                 rootActor.ask(actor ->
                         actor.<Atomic>createActor(self -> new Atomic(self, pattern, 10L, Arrays.asList()))
                 ).awaitUnchecked()
@@ -334,7 +334,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }
@@ -349,7 +349,7 @@ public class ReasoningTest {
 
     @Test
     public void bulkActorCreation() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
@@ -359,14 +359,14 @@ public class ReasoningTest {
             rules.add(Arrays.asList(i));
         }
         long start = System.currentTimeMillis();
-        actorRegistry.registerAtomic(1L, pattern ->
+        registry.registerAtomic(1L, pattern ->
                 rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, rules))).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
         conjunctive.tell(actor ->
                 actor.executeReceiveRequest(
                         new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                        actorRegistry
+                        registry
                 )
         );
         responses.take();
@@ -376,14 +376,14 @@ public class ReasoningTest {
 
     @Test
     public void loopTermination() throws InterruptedException {
-        ActorRegistry actorRegistry = new ActorRegistry();
+        Registry registry = new Registry();
         LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // conjunction1 -> atomic1 -> rule1 -> conjunction2 -> atomic1
-        actorRegistry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))).awaitUnchecked());
-        actorRegistry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
+        registry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))).awaitUnchecked());
+        registry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
         Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
 
         long n = 0L + 1L + 1L + 1L + 1;
@@ -391,7 +391,7 @@ public class ReasoningTest {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
                             new Request(new Plan(Arrays.asList(conjunctive)).toNextStep(), Arrays.asList(), Arrays.asList(), Arrays.asList()),
-                            actorRegistry
+                            registry
                     )
             );
         }

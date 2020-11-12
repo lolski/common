@@ -7,6 +7,7 @@ import grakn.common.poc.reasoning.execution.Plan;
 import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
+import grakn.common.poc.reasoning.mock.MockTransaction;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -91,13 +92,13 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     }
 
     @Override
-    protected void initialiseDownstreamActors(ActorRegistry actorRegistry) {
+    protected void initialiseDownstreamActors(Registry registry) {
         List<Long> planned = new ArrayList<>(conjunction);
         Collections.reverse(planned);
         planned = Collections.unmodifiableList(planned);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
-            Actor<Atomic> atomicActor = actorRegistry.registerAtomic(atomicPattern, (pattern) ->
+            Actor<Atomic> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
                     child((newActor) -> new Atomic(newActor, pattern, 5L, Arrays.asList())));
             plannedAtomics.add(atomicActor);
         }
