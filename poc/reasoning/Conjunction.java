@@ -23,11 +23,6 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     private final List<Long> conjunction;
     private List<Actor<Atomic>> plannedAtomics;
 
-    Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
-                final Long traversalSize) {
-        this(self, conjunction, traversalSize, null);
-    }
-
     public Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
                 final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
         super(self, Conjunction.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
