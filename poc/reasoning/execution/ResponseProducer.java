@@ -6,11 +6,11 @@ import java.util.Iterator;
 import java.util.List;
 
 public class ResponseProducer {
-    private final List<Request> downstreamsAvailable;
+    private final List<Request> readyDownstreamRequests;
     private List<Iterator<Long>> traversalProducers;
 
     public ResponseProducer() {
-        this.downstreamsAvailable = new ArrayList<>();
+        this.readyDownstreamRequests = new ArrayList<>();
         this.traversalProducers = new ArrayList<>();
     }
 
@@ -28,19 +28,19 @@ public class ResponseProducer {
         return null;
     }
 
-    public void addAvailableDownstream(final Request toDownstream) {
-        downstreamsAvailable.add(toDownstream);
+    public void addReadyDownstream(final Request toDownstream) {
+        readyDownstreamRequests.add(toDownstream);
     }
 
-    public Request getAvailableDownstream() {
-        return downstreamsAvailable.get(0);
+    public Request getReadyDownstreamRequest() {
+        return readyDownstreamRequests.get(0);
     }
 
-    public boolean downstreamsExhausted() {
-        return downstreamsAvailable.isEmpty();
+    public boolean hasReadyDownstreamRequest() {
+        return !readyDownstreamRequests.isEmpty();
     }
 
-    public void downstreamExhausted(final Request request) {
-        downstreamsAvailable.remove(request);
+    public void removeReadyDownstream(final Request request) {
+        readyDownstreamRequests.remove(request);
     }
 }

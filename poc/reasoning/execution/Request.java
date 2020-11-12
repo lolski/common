@@ -1,6 +1,8 @@
 package grakn.common.poc.reasoning.execution;
 
 
+import grakn.common.concurrent.actor.Actor;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -11,7 +13,8 @@ public class Request {
     private final List<Object> constraints;
     private final List<Object> unifiers;
 
-    public Request(Plan plan,
+    public Request(Actor<? extends ExecutionActor<?>> downstream,
+                   Plan plan,
                    List<Long> partialAnswer,
                    List<Object> constraints,
                    List<Object> unifiers) {

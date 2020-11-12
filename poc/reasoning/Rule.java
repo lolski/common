@@ -37,39 +37,50 @@ public class Rule extends ExecutionActor<Rule> {
         if (responseProducer.getOneTraversalProducer() != null) {
             List<Long> answers = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
-        } else if (!responseProducer.downstreamsExhausted()) {
-            return Either.first(responseProducer.getAvailableDownstream());
+                    new Response.Answer(fromUpstream, responsePlan, self(), answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+        } else if (responseProducer.hasReadyDownstreamRequest()) {
+            return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
-            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
+            return Either.second(new Response.Exhausted(fromUpstream, responsePlan, self()));
         }
-
     }
 
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer) {
-        Plan forwardingPlan = forwardingPlan(fromDownstream);
 
-        List<Long> newAnswer = fromDownstream.partialAnswer();
+        Actor<? extends ExecutionActor<?>> downstream = fromDownstream.downstream();
+        if (isLast(downstream)) {
 
-        // TODO unify and materialise
+            // TODO unify and materialise
 
-        return Either.second(
-                new Response.Answer(fromUpstream, forwardingPlan, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
+            Plan upstreamPlan = upstreamPlan(fromDownstream);
+            List<Long> newAnswer = fromDownstream.partialAnswer();
+            return Either.second(
+                    new Response.Answer(fromUpstream, upstreamPlan, self(), newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
+        } else {
+            Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(downstream);
+            Request downstreamRequest = new Request(nextPlannedDownstream, null, fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+            return Either.first(downstreamRequest);
+        }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
-        // every rule has exactly 1 downstream, so an exhausted message must indicate the downstream is exhausted
-        responseProducer.downstreamExhausted(fromDownstream.sourceRequest());
-        Plan responsePlan = respondingPlan(fromUpstream);
+        Actor<? extends ExecutionActor<?>> downstream = fromDownstream.downstream();
 
-        if (responseProducer.getOneTraversalProducer() != null) {
-            List<Long> answers = produceTraversalAnswer(responseProducer);
-            return Either.second(
-                    new Response.Answer(fromUpstream, responsePlan, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+        if (isFirst(downstream)) {
+            // every rule has exactly 1 ready downstream, so an exhausted message must indicate the downstream is exhausted
+            responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
+
+            if (responseProducer.getOneTraversalProducer() != null) {
+                List<Long> answers = produceTraversalAnswer(responseProducer);
+                return Either.second(
+                        new Response.Answer(fromUpstream, null, self(), answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+            } else {
+                return Either.second(new Response.Exhausted(fromUpstream, null, self()));
+            }
         } else {
-            return Either.second(new Response.Exhausted(fromUpstream, responsePlan));
+            return Either.first(new Request(plannedAtomics.get(0), null, fromUpstream.partialAnswer(), fromUpstream.constraints(), fromUpstream.unifiers()));
         }
     }
 
@@ -78,7 +89,7 @@ public class Rule extends ExecutionActor<Rule> {
         ResponseProducer responseProducer = new ResponseProducer();
         Plan nextPlan = request.plan().addSteps(this.plannedAtomics).toNextStep();
         Request toDownstream = new Request(nextPlan, request.partialAnswer(), request.constraints(), request.unifiers() );
-        responseProducer.addAvailableDownstream(toDownstream);
+        responseProducer.addReadyDownstream(toDownstream);
 
         Long startingAnswer = when.stream().reduce((acc, val) -> acc + val).get();
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
@@ -110,7 +121,19 @@ public class Rule extends ExecutionActor<Rule> {
         return fromUpstream.plan().endStepCompleted();
     }
 
-    private Plan forwardingPlan(final Response.Answer fromDownstream) {
+    private Plan upstreamPlan(final Response.Answer fromDownstream) {
         return fromDownstream.plan().endStepCompleted();
+    }
+
+    private boolean isFirst(Actor<? extends ExecutionActor<?>>  actor) {
+        return plannedAtomics.get(0).equals(actor);
+    }
+
+    private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {
+        return plannedAtomics.get(plannedAtomics.size() - 1).equals(actor);
+    }
+
+    private Actor<Atomic> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
+        return plannedAtomics.get(plannedAtomics.indexOf(actor) + 1);
     }
 }
