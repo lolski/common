@@ -2,16 +2,18 @@ package grakn.common.poc.reasoning.execution;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public class ResponseProducer {
-    private final LinkedHashSet<Request> readyDownstreamRequests;
+    private final Set<Request> readyDownstreamRequests;
     private List<Iterator<List<Long>>> traversalProducers;
     private Iterator<Request> nextProducer;
     public ResponseProducer() {
-        this.readyDownstreamRequests = new LinkedHashSet<>();
+        this.readyDownstreamRequests = new HashSet<>();
         this.traversalProducers = new ArrayList<>();
         nextProducer = readyDownstreamRequests.iterator();
     }
