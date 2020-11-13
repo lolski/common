@@ -1,35 +1,27 @@
 package grakn.common.poc.reasoning.execution;
 
-import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 public class ResponseProducer {
     private final Set<Request> readyDownstreamRequests;
-    private List<Iterator<List<Long>>> traversalProducers;
+    private final Iterator<List<Long>> traversalProducer;
     private Iterator<Request> nextProducer;
-    public ResponseProducer() {
+
+    public ResponseProducer(Iterator<List<Long>> traversalProducer) {
         this.readyDownstreamRequests = new HashSet<>();
-        this.traversalProducers = new ArrayList<>();
+        this.traversalProducer = traversalProducer;
         nextProducer = readyDownstreamRequests.iterator();
     }
 
-    public void addTraversalProducer(final Iterator<List<Long>> traversalProducer) {
-        traversalProducers.add(traversalProducer);
+    public boolean hasTraversalProducer() {
+        return traversalProducer.hasNext();
     }
 
-    public void removeTraversalProducer(final Iterator<List<Long>> traversalProducer) {
-        traversalProducers.remove(traversalProducer);
-    }
-
-    @Nullable
-    public Iterator<List<Long>> getOneTraversalProducer() {
-        if (!traversalProducers.isEmpty()) return traversalProducers.get(0);
-        return null;
+    public Iterator<List<Long>> traversalProducer() {
+        return traversalProducer;
     }
 
     public void addReadyDownstream(final Request toDownstream) {

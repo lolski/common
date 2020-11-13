@@ -29,10 +29,10 @@ public class Rule extends ExecutionActor<Rule> {
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        if (responseProducer.getOneTraversalProducer() != null) {
-            List<Long> answers = produceTraversalAnswer(responseProducer);
+        if (responseProducer.hasTraversalProducer()) {
+            List<Long> answer = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (responseProducer.hasReadyDownstreamRequest()) {
             return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
@@ -63,10 +63,10 @@ public class Rule extends ExecutionActor<Rule> {
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
 
-        if (responseProducer.getOneTraversalProducer() != null) {
-            List<Long> answers = produceTraversalAnswer(responseProducer);
+        if (responseProducer.hasTraversalProducer()) {
+            List<Long> answer = produceTraversalAnswer(responseProducer);
             return Either.second(
-                    new Response.Answer(fromUpstream, answers, fromUpstream.constraints(), fromUpstream.unifiers()));
+                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else if (responseProducer.hasReadyDownstreamRequest()) {
             return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
@@ -76,13 +76,12 @@ public class Rule extends ExecutionActor<Rule> {
 
     @Override
     protected ResponseProducer createResponseProducer(final Request request) {
-        ResponseProducer responseProducer = new ResponseProducer();
+        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, 0L, 1)).query(when);
+        ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
                 request.constraints(), request.unifiers());
         responseProducer.addReadyDownstream(toDownstream);
 
-        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, 0L, 1)).query(when);
-        if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         return responseProducer;
     }
 
@@ -100,10 +99,8 @@ public class Rule extends ExecutionActor<Rule> {
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
-        Iterator<List<Long>> traversalProducer = responseProducer.getOneTraversalProducer();
-        List<Long> answer = traversalProducer.next();
-        if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-        return answer;
+        Iterator<List<Long>> traversalProducer = responseProducer.traversalProducer();
+        return traversalProducer.next();
     }
 
     private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {
