@@ -21,7 +21,7 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     private final List<Actor<Atomic>> plannedAtomics;
 
     public Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
-                final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
+                final Long traversalSize, final LinkedBlockingQueue<List<Long>> responses) {
         super(self, Conjunction.class.getSimpleName() + "(pattern:" + conjunction + ")", responses);
 
         this.conjunction = conjunction;
@@ -81,8 +81,7 @@ public class Conjunction extends ExecutionActor<Conjunction> {
                 request.constraints(), request.unifiers());
         responseProducer.addReadyDownstream(toDownstream);
 
-        Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get() + -100;
-        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
+        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, 0L, 1)).query(conjunction);
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         return responseProducer;
     }
@@ -101,10 +100,10 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
-        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        Long answer = traversalProducer.next();
+        Iterator<List<Long>> traversalProducer = responseProducer.getOneTraversalProducer();
+        List<Long> answer = traversalProducer.next();
         if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-        return Arrays.asList(answer);
+        return answer;
     }
 
     private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {

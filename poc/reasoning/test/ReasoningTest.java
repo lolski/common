@@ -17,6 +17,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.list;
 import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertTrue;
 
 public class ReasoningTest {
@@ -24,7 +25,7 @@ public class ReasoningTest {
     public void singleAtomicActor() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -48,12 +49,12 @@ public class ReasoningTest {
                             registry
                     )
             );
-            Long answer = responses.take();
+            List<Long> answer = responses.take();
             System.out.println(answer);
             if (i < n - 1) {
-                assertTrue(answer != -1);
+                assertTrue(!answer.isEmpty());
             } else {
-                assertTrue(answer == -1);
+                assertTrue(answer.isEmpty());
             }
         }
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
@@ -64,7 +65,7 @@ public class ReasoningTest {
     public void doubleAtomicActor() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -96,10 +97,10 @@ public class ReasoningTest {
         }
 
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
-            assertTrue(answer != -1);
+            List<Long> answer = responses.take();
+            assertTrue(!answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
 //        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
@@ -109,7 +110,7 @@ public class ReasoningTest {
     public void filteringAtomicActor() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -141,10 +142,10 @@ public class ReasoningTest {
         }
 
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
-            assertTrue(answer != -1);
+            List<Long> answer = responses.take();
+            assertTrue(!answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
 //        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
@@ -154,7 +155,7 @@ public class ReasoningTest {
     public void simpleRule() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -185,10 +186,10 @@ public class ReasoningTest {
         }
 
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
-            assertTrue(answer != -1);
+            List<Long> answer = responses.take();
+            assertTrue(!answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
     }
@@ -197,7 +198,7 @@ public class ReasoningTest {
     public void atomicChainWithRule() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -233,11 +234,11 @@ public class ReasoningTest {
         }
 
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
+            List<Long> answer = responses.take();
             System.out.println("---- take(): " + answer);
-            assertTrue(answer != -1);
+            assertTrue(!answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
     }
@@ -246,24 +247,24 @@ public class ReasoningTest {
     public void shallowRerequest() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // create atomic actors first to control answer size
         registry.registerAtomic(2L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         registry.registerAtomic(20L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         registry.registerAtomic(200L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 4L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 2L, Arrays.asList()))
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
@@ -271,7 +272,7 @@ public class ReasoningTest {
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
-        long n = 0L + (4L * 4L * 4L) + 1;
+        long n = 0L + (2L * 2L * 2L) + 1;
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
@@ -281,10 +282,10 @@ public class ReasoningTest {
             );
         }
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
-            assertTrue(answer != -1);
+            List<Long> answer = responses.take();
+            assertFalse(answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
     }
@@ -293,7 +294,7 @@ public class ReasoningTest {
     public void deepRerequest() throws InterruptedException {
         Registry registry = new Registry();
 
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -338,10 +339,10 @@ public class ReasoningTest {
             );
         }
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
-            assertTrue(answer != -1);
+            List<Long> answer = responses.take();
+            assertTrue(!answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
     }
@@ -349,7 +350,7 @@ public class ReasoningTest {
     @Test
     public void bulkActorCreation() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -376,7 +377,7 @@ public class ReasoningTest {
     @Test
     public void loopTermination() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<Long> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
@@ -395,10 +396,10 @@ public class ReasoningTest {
             );
         }
         for (int i = 0; i < n - 1; i++) {
-            Long answer = responses.take();
-            assertTrue(answer != -1);
+            List<Long> answer = responses.take();
+            assertTrue(!answer.isEmpty());
         }
-        assertEquals(responses.take().longValue(), -1L);
+        assertEquals(responses.take(), Arrays.asList());
         assertTrue(responses.isEmpty());
     }
 

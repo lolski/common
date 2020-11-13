@@ -22,8 +22,8 @@ public class Atomic extends ExecutionActor<Atomic> {
     private final Long traversalPattern;
     private final long traversalSize;
     private final List<List<Long>> rules;
-    private List<Actor<Rule>> ruleActors;
-    private Set<RuleTrigger> triggered;
+    private final List<Actor<Rule>> ruleActors;
+    private final Set<RuleTrigger> triggered;
 
     public Atomic(final Actor<Atomic> self, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
         super(self, Atomic.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
@@ -117,16 +117,14 @@ public class Atomic extends ExecutionActor<Atomic> {
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
-        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        Long answer = traversalProducer.next();
+        Iterator<List<Long>> traversalProducer = responseProducer.getOneTraversalProducer();
+        List<Long> answer = traversalProducer.next();
         if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-        answer += this.traversalPattern;
-        return Arrays.asList(answer);
+        return answer;
     }
 
     private void registerTraversal(ResponseProducer responseProducer, final List<Long> partialAnswer) {
-        Long mergedAnswer = partialAnswer.stream().reduce(0L, (acc, v) -> acc + v);
-        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(mergedAnswer);
+        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalPattern, 1)).query(partialAnswer);
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
     }
 

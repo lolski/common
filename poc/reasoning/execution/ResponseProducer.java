@@ -7,23 +7,23 @@ import java.util.List;
 
 public class ResponseProducer {
     private final List<Request> readyDownstreamRequests;
-    private List<Iterator<Long>> traversalProducers;
+    private List<Iterator<List<Long>>> traversalProducers;
 
     public ResponseProducer() {
         this.readyDownstreamRequests = new ArrayList<>();
         this.traversalProducers = new ArrayList<>();
     }
 
-    public void addTraversalProducer(final Iterator<Long> traversalProducer) {
+    public void addTraversalProducer(final Iterator<List<Long>> traversalProducer) {
         traversalProducers.add(traversalProducer);
     }
 
-    public void removeTraversalProducer(final Iterator<Long> traversalProducer) {
+    public void removeTraversalProducer(final Iterator<List<Long>> traversalProducer) {
         traversalProducers.remove(traversalProducer);
     }
 
     @Nullable
-    public Iterator<Long> getOneTraversalProducer() {
+    public Iterator<List<Long>> getOneTraversalProducer() {
         if (!traversalProducers.isEmpty()) return traversalProducers.get(0);
         return null;
     }

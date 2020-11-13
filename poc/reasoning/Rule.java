@@ -17,7 +17,7 @@ import java.util.List;
 public class Rule extends ExecutionActor<Rule> {
     private final List<Long> when;
     private final Long traversalSize;
-    private List<Actor<Atomic>> plannedAtomics;
+    private final List<Actor<Atomic>> plannedAtomics;
 
     public Rule(final Actor<Rule> self, final List<Long> when,
                 final Long traversalSize) {
@@ -81,8 +81,7 @@ public class Rule extends ExecutionActor<Rule> {
                 request.constraints(), request.unifiers());
         responseProducer.addReadyDownstream(toDownstream);
 
-        Long startingAnswer = when.stream().reduce((acc, val) -> acc + val).get() + -100;
-        Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
+        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, 0L, 1)).query(when);
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         return responseProducer;
     }
@@ -101,14 +100,10 @@ public class Rule extends ExecutionActor<Rule> {
     }
 
     private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
-        Iterator<Long> traversalProducer = responseProducer.getOneTraversalProducer();
-        Long answer = traversalProducer.next();
+        Iterator<List<Long>> traversalProducer = responseProducer.getOneTraversalProducer();
+        List<Long> answer = traversalProducer.next();
         if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
-        return Arrays.asList(answer);
-    }
-
-    private boolean isFirst(Actor<? extends ExecutionActor<?>>  actor) {
-        return plannedAtomics.get(0).equals(actor);
+        return answer;
     }
 
     private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {

@@ -7,9 +7,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import static grakn.common.collection.Collections.list;
 
 public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T>{
     private static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
@@ -17,7 +21,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     String name;
     private boolean isInitialised;
     @Nullable
-    private final LinkedBlockingQueue<Long> responses;
+    private final LinkedBlockingQueue<List<Long>> responses;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
@@ -25,7 +29,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         this(self, name, null);
     }
 
-    public ExecutionActor(final Actor<T> self, final String name, LinkedBlockingQueue<Long> responses) {
+    public ExecutionActor(final Actor<T> self, final String name, LinkedBlockingQueue<List<Long>> responses) {
         super(self);
         this.name = name;
         isInitialised = false;
@@ -108,12 +112,11 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         if (receiver == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             if (response.isAnswer()) {
-                Long mergedAnswer = response.asAnswer().partialAnswer().stream().reduce(0L, (acc, val) -> acc + val);
                 LOG.debug(name + ": Writing Answer to output queue");
-                responses.add(mergedAnswer);
+                responses.add(response.asAnswer().partialAnswer());
             } else {
                 LOG.debug(name + ": Writing Exhausted to output queue");
-                responses.add(-1L);
+                responses.add(list());
             }
         } else {
             if (response.isAnswer()) {
