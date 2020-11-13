@@ -44,7 +44,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -89,7 +89,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -134,7 +134,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -178,7 +178,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -226,7 +226,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -275,7 +275,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -332,7 +332,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );
@@ -364,7 +364,7 @@ public class ReasoningTest {
         Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
         conjunctive.tell(actor ->
                 actor.executeReceiveRequest(
-                        new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                        new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                         registry
                 )
         );
@@ -373,7 +373,6 @@ public class ReasoningTest {
         System.out.println("elapsed = " + elapsed);
     }
 
-    // TODO: start looking at deadlock here
     @Test
     public void loopTermination() throws InterruptedException {
         Registry registry = new Registry();
@@ -381,7 +380,7 @@ public class ReasoningTest {
         EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
-        // conjunction1 -> atomic1 -> rule1 -> conjunction2 -> atomic1
+        // conjunction1 -> atomic1 -> rule1 -> atomic1
         registry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))).awaitUnchecked());
         registry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
         Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, Arrays.asList(1L), 0L, responses))).awaitUnchecked();
@@ -390,7 +389,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(null, conjunctive, Arrays.asList(), Arrays.asList(), Arrays.asList()),
+                            new Request(new Request.Path(conjunctive), Arrays.asList(), Arrays.asList(), Arrays.asList()),
                             registry
                     )
             );

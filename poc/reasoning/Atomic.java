@@ -57,7 +57,7 @@ public class Atomic extends ExecutionActor<Atomic> {
             registerTraversal(responseProducer, fromDownstream.partialAnswer());
             RuleTrigger trigger = new RuleTrigger(fromDownstream.partialAnswer(), fromDownstream.constraints());
             if (!triggered.contains(trigger)) {
-                registerDownstreamRules(responseProducer, fromDownstream.partialAnswer(),
+                registerDownstreamRules(responseProducer, fromUpstream.path(), fromDownstream.partialAnswer(),
                         fromDownstream.constraints(), fromDownstream.unifiers());
                 triggered.add(trigger);
             }
@@ -102,7 +102,7 @@ public class Atomic extends ExecutionActor<Atomic> {
         registerTraversal(responseProducer, request.partialAnswer());
         RuleTrigger trigger = new RuleTrigger(request.partialAnswer(), request.constraints());
         if (!triggered.contains(trigger)) {
-            registerDownstreamRules(responseProducer, request.partialAnswer(), request.constraints(), request.unifiers());
+            registerDownstreamRules(responseProducer, request.path(), request.partialAnswer(), request.constraints(), request.unifiers());
             triggered.add(trigger);
         }
         return responseProducer;
@@ -130,10 +130,10 @@ public class Atomic extends ExecutionActor<Atomic> {
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
     }
 
-    private void registerDownstreamRules(final ResponseProducer responseProducer, final List<Long> partialAnswers,
+    private void registerDownstreamRules(final ResponseProducer responseProducer, final Request.Path path, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActors) {
-            Request toDownstream = new Request(self(), ruleActor, partialAnswers, constraints, unifiers);
+            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers);
             responseProducer.addReadyDownstream(toDownstream);
         }
     }

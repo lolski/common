@@ -3,36 +3,46 @@ package grakn.common.poc.reasoning.execution;
 
 import grakn.common.concurrent.actor.Actor;
 
+import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import static grakn.common.collection.Collections.list;
+
 public class Request {
-    private Actor<? extends ExecutionActor<?>> sender;
-    private Actor<? extends ExecutionActor<?>> receiver;
+    private final Path path;
     private final List<Long> partialAnswer;
     private final List<Object> constraints;
     private final List<Object> unifiers;
 
-    public Request(Actor<? extends ExecutionActor<?>> sender,
-                   Actor<? extends ExecutionActor<?>> receiver,
+    public Request(Path path,
                    List<Long> partialAnswer,
                    List<Object> constraints,
                    List<Object> unifiers) {
-        this.sender = sender;
-        this.receiver = receiver;
+        this.path = path;
         this.partialAnswer = partialAnswer;
         this.constraints = constraints;
         this.unifiers = unifiers;
     }
 
+    public Path path() {
+        return path;
+    }
+
+
+
+    @Nullable
     public Actor<? extends ExecutionActor<?>> sender() {
-        return sender;
+        if (path.path.size() < 2) {
+            return null;
+        }
+        return path.path.get(path.path.size() - 2);
     }
 
     public Actor<? extends ExecutionActor<?>> receiver() {
-        return receiver;
+        return path.path.get(path.path.size() - 1);
     }
-
     public List<Long> partialAnswer() {
         return partialAnswer;
     }
@@ -50,7 +60,7 @@ public class Request {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Request request = (Request) o;
-        return Objects.equals(receiver, request.receiver) &&
+        return Objects.equals(path, request.path) &&
                 Objects.equals(partialAnswer, request.partialAnswer()) &&
                 Objects.equals(constraints, request.constraints()) &&
                 Objects.equals(unifiers, request.unifiers());
@@ -58,11 +68,43 @@ public class Request {
 
     @Override
     public int hashCode() {
-        return Objects.hash(receiver, partialAnswer, constraints, unifiers);
+        return Objects.hash(path, partialAnswer, constraints, unifiers);
     }
 
     @Override
     public String toString() {
-        return "Req(send=" + (sender == null ? "<none>" : sender.state.name) + ", pAns=" + partialAnswer + ")";
+        return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialAnswer + ")";
+    }
+
+    public static class Path {
+        final List<Actor<? extends ExecutionActor<?>>> path;
+
+        public Path(Actor<? extends ExecutionActor<?>> sender) {
+            this(list(sender));
+        }
+
+        private Path(List<Actor<? extends ExecutionActor<?>>> path) {
+            assert !path.isEmpty() : "Path cannot be empty";
+            this.path = path;
+        }
+
+        public Path append(Actor<? extends ExecutionActor<?>> actor) {
+            List<Actor<? extends ExecutionActor<?>>> appended = new ArrayList<>(path);
+            appended.add(actor);
+            return new Path(appended);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Path path1 = (Path) o;
+            return Objects.equals(path, path1.path);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(path);
+        }
     }
 }

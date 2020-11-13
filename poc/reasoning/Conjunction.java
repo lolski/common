@@ -18,7 +18,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class Conjunction extends ExecutionActor<Conjunction> {
     private final Long traversalSize;
     private final List<Long> conjunction;
-    private List<Actor<Atomic>> plannedAtomics;
+    private final List<Actor<Atomic>> plannedAtomics;
 
     public Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
                 final Long traversalSize, final LinkedBlockingQueue<Long> responses) {
@@ -52,7 +52,8 @@ public class Conjunction extends ExecutionActor<Conjunction> {
                     new Response.Answer(fromUpstream, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
-            Request downstreamRequest = new Request(self(), nextPlannedDownstream, fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+            Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
+                    fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
             responseProducer.addReadyDownstream(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -76,11 +77,11 @@ public class Conjunction extends ExecutionActor<Conjunction> {
     @Override
     protected ResponseProducer createResponseProducer(final Request request) {
         ResponseProducer responseProducer = new ResponseProducer();
-
-        Request toDownstream = new Request(self(), plannedAtomics.get(0), request.partialAnswer(), request.constraints(), request.unifiers());
+        Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
+                request.constraints(), request.unifiers());
         responseProducer.addReadyDownstream(toDownstream);
 
-        Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get();
+        Long startingAnswer = conjunction.stream().reduce((acc, val) -> acc + val).get() + -100;
         Iterator<Long> traversal = (new MockTransaction(traversalSize, 1)).query(startingAnswer);
         if (traversal.hasNext()) responseProducer.addTraversalProducer(traversal);
         return responseProducer;
@@ -104,10 +105,6 @@ public class Conjunction extends ExecutionActor<Conjunction> {
         Long answer = traversalProducer.next();
         if (!traversalProducer.hasNext()) responseProducer.removeTraversalProducer(traversalProducer);
         return Arrays.asList(answer);
-    }
-
-    private boolean isFirst(Actor<? extends ExecutionActor<?>>  actor) {
-        return plannedAtomics.get(0).equals(actor);
     }
 
     private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {

@@ -45,7 +45,6 @@ public class Rule extends ExecutionActor<Rule> {
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
 
         if (isLast(sender)) {
-
             // TODO unify and materialise
             // TODO: deduplicate answer: if the answer that you want to send up is already sent before, retry or send done if all downstreams are exhausted
             List<Long> newAnswer = fromDownstream.partialAnswer();
@@ -53,7 +52,8 @@ public class Rule extends ExecutionActor<Rule> {
                     new Response.Answer(fromUpstream, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
             Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
-            Request downstreamRequest = new Request(self(), nextPlannedDownstream, fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+            Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
+                    fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
             responseProducer.addReadyDownstream(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -77,8 +77,8 @@ public class Rule extends ExecutionActor<Rule> {
     @Override
     protected ResponseProducer createResponseProducer(final Request request) {
         ResponseProducer responseProducer = new ResponseProducer();
-
-        Request toDownstream = new Request(self(), plannedAtomics.get(0), request.partialAnswer(), request.constraints(), request.unifiers());
+        Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
+                request.constraints(), request.unifiers());
         responseProducer.addReadyDownstream(toDownstream);
 
         Long startingAnswer = when.stream().reduce((acc, val) -> acc + val).get() + -100;
