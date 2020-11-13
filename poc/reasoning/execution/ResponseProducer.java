@@ -3,17 +3,17 @@ package grakn.common.poc.reasoning.execution;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 public class ResponseProducer {
-    private final List<Request> readyDownstreamRequests;
+    private final LinkedHashSet<Request> readyDownstreamRequests;
     private List<Iterator<List<Long>>> traversalProducers;
-    private int nextDownstream;
-
+    private Iterator<Request> nextProducer;
     public ResponseProducer() {
-        this.readyDownstreamRequests = new ArrayList<>();
+        this.readyDownstreamRequests = new LinkedHashSet<>();
         this.traversalProducers = new ArrayList<>();
-        this.nextDownstream = 0;
+        nextProducer = readyDownstreamRequests.iterator();
     }
 
     public void addTraversalProducer(final Iterator<List<Long>> traversalProducer) {
@@ -22,7 +22,6 @@ public class ResponseProducer {
 
     public void removeTraversalProducer(final Iterator<List<Long>> traversalProducer) {
         traversalProducers.remove(traversalProducer);
-        this.nextDownstream = 0;
     }
 
     @Nullable
@@ -32,13 +31,15 @@ public class ResponseProducer {
     }
 
     public void addReadyDownstream(final Request toDownstream) {
+        assert !(readyDownstreamRequests.contains(toDownstream)) : "ready downstream requests already contains this request";
+
         readyDownstreamRequests.add(toDownstream);
+        nextProducer = readyDownstreamRequests.iterator();
     }
 
     public Request getReadyDownstreamRequest() {
-        Request downstreamRequest = readyDownstreamRequests.get(nextDownstream);
-        if (readyDownstreamRequests.size() > 1) nextDownstream = (nextDownstream + 1) % (readyDownstreamRequests.size() - 1);
-        return downstreamRequest;
+        if (!nextProducer.hasNext()) nextProducer = readyDownstreamRequests.iterator();
+        return nextProducer.next();
     }
 
     public boolean hasReadyDownstreamRequest() {
@@ -46,6 +47,9 @@ public class ResponseProducer {
     }
 
     public void removeReadyDownstream(final Request request) {
-        readyDownstreamRequests.remove(request);
+        boolean removed = readyDownstreamRequests.remove(request);
+        // only update the iterator when removing an element, to avoid resetting and reusing first request too often
+        // note: this is a large performance win when processing large batches of requests
+        if (removed) nextProducer = readyDownstreamRequests.iterator();
     }
 }

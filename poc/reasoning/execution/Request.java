@@ -30,8 +30,6 @@ public class Request {
         return path;
     }
 
-
-
     @Nullable
     public Actor<? extends ExecutionActor<?>> sender() {
         if (path.path.size() < 2) {
