@@ -330,6 +330,7 @@ public class ReasoningTest {
 
         long startTime = System.currentTimeMillis();
         long n = 0L + (10L * 10L * 10L * 10L * 10L) + 1;
+        System.out.println("Number of requests: " + n);
         for (int i = 0; i < n; i++) {
             conjunctive.tell(actor ->
                     actor.executeReceiveRequest(
@@ -338,6 +339,7 @@ public class ReasoningTest {
                     )
             );
         }
+        System.out.println("Starting to take");
         for (int i = 0; i < n - 1; i++) {
             List<Long> answer = responses.take();
             assertTrue(!answer.isEmpty());

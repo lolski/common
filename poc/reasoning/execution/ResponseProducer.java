@@ -8,10 +8,12 @@ import java.util.List;
 public class ResponseProducer {
     private final List<Request> readyDownstreamRequests;
     private List<Iterator<List<Long>>> traversalProducers;
+    private int nextDownstream;
 
     public ResponseProducer() {
         this.readyDownstreamRequests = new ArrayList<>();
         this.traversalProducers = new ArrayList<>();
+        this.nextDownstream = 0;
     }
 
     public void addTraversalProducer(final Iterator<List<Long>> traversalProducer) {
@@ -20,6 +22,7 @@ public class ResponseProducer {
 
     public void removeTraversalProducer(final Iterator<List<Long>> traversalProducer) {
         traversalProducers.remove(traversalProducer);
+        this.nextDownstream = 0;
     }
 
     @Nullable
@@ -33,7 +36,9 @@ public class ResponseProducer {
     }
 
     public Request getReadyDownstreamRequest() {
-        return readyDownstreamRequests.get(0);
+        Request downstreamRequest = readyDownstreamRequests.get(nextDownstream);
+        if (readyDownstreamRequests.size() > 1) nextDownstream = (nextDownstream + 1) % (readyDownstreamRequests.size() - 1);
+        return downstreamRequest;
     }
 
     public boolean hasReadyDownstreamRequest() {
