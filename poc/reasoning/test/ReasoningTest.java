@@ -415,4 +415,36 @@ public class ReasoningTest {
         assertTrue(responses.isEmpty());
     }
 
+    @Test
+    public void deduplication() throws InterruptedException {
+        Registry registry = new Registry();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        EventLoopGroup eventLoop = new EventLoopGroup(1, "reasoning-elg");
+        Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
+
+        registry.registerAtomic(1L, pattern ->
+                rootActor.ask(actor ->
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 100L, list()))
+                ).awaitUnchecked()
+        );
+        Actor<Conjunction> conjunctive = rootActor.ask(actor ->
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(1L), 100L, 1L, responses))
+        ).awaitUnchecked();
+
+        long n = 100L + 1L;
+        for (int i = 0; i < n; i++) {
+            conjunctive.tell(actor ->
+                    actor.executeReceiveRequest(
+                            new Request(new Request.Path(conjunctive), list(), list(), list()),
+                            registry
+                    )
+            );
+        }
+        for (int i = 0; i < n - 1; i++) {
+            List<Long> answer = responses.take();
+            assertTrue(!answer.isEmpty());
+        }
+        assertEquals(responses.take(), list());
+        assertTrue(responses.isEmpty());
+    }
 }
