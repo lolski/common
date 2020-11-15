@@ -15,15 +15,13 @@ import static grakn.common.collection.Collections.extend;
  * Repeatedly calling query() will repeat the same calculation loop in a new iterator
  */
 public class MockTransaction {
-    private static AtomicLong traversalPatternDifferentiator = new AtomicLong(0L);
     private final long computeLength;
     private final Long traversalPattern;
     private final int answerInterval;
 
     public MockTransaction(long computeLength, Long traversalPattern, int answerInterval) {
-        long differentiator = traversalPatternDifferentiator.getAndAdd(100);
-        this.computeLength = computeLength + traversalPattern + differentiator;
-        this.traversalPattern = traversalPattern + differentiator;
+        this.computeLength = computeLength + traversalPattern;
+        this.traversalPattern = traversalPattern;
         this.answerInterval = answerInterval;
 
     }

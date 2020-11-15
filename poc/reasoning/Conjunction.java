@@ -7,7 +7,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class Conjunction extends AbstractConjunction<Conjunction> {
     public Conjunction(final Actor<Conjunction> self, final List<Long> conjunction,
-                final Long traversalSize, final LinkedBlockingQueue<List<Long>> responses) {
-        super(self, Conjunction.class.getSimpleName() + "(pattern:" + conjunction + ")", conjunction, traversalSize, responses);
+                final Long traversalSize, final Long traversalOffset, final LinkedBlockingQueue<List<Long>> responses) {
+        super(self, Conjunction.class.getSimpleName() + "(pattern:" + conjunction + ")", conjunction, traversalSize, traversalOffset, responses);
     }
 }

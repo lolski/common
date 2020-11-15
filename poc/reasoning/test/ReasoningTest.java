@@ -36,7 +36,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(0L), 5L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(0L), 5L, 0L, responses))
         ).awaitUnchecked();
 
 
@@ -81,7 +81,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20L, 2L), 0L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20L, 2L), 0L, 0L, responses))
         ).awaitUnchecked();
 
 
@@ -126,7 +126,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20L, 2L), 0L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20L, 2L), 0L, 0L, responses))
         ).awaitUnchecked();
 
 
@@ -167,7 +167,7 @@ public class ReasoningTest {
         );
         registry.registerRule(list(-2L), pattern ->
                 rootActor.ask(actor ->
-                        actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))
+                        actor.<Rule>createActor(self -> new Rule(self, pattern, 1L, 0L))
                 ).awaitUnchecked()
         );
         registry.registerAtomic(2L, pattern ->
@@ -176,7 +176,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(2L), 0L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(2L), 0L, 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -215,7 +215,7 @@ public class ReasoningTest {
         );
         registry.registerRule(list(-2L), pattern ->
                 rootActor.ask(actor ->
-                        actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))
+                        actor.<Rule>createActor(self -> new Rule(self, pattern, 1L, 0L))
                 ).awaitUnchecked()
         );
         Actor<Atomic> atomicWithRule = registry.registerAtomic(2L, pattern ->
@@ -229,7 +229,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20L, 2L), 0L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20L, 2L), 0L, 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -278,7 +278,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(200L, 20L, 2L), 0L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(200L, 20L, 2L), 0L, 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -335,7 +335,7 @@ public class ReasoningTest {
                 ).awaitUnchecked()
         );
         Actor<Conjunction> conjunctive = rootActor.ask(actor ->
-                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20000L, 2000L, 200L, 20L, 2L), 0L, responses))
+                actor.<Conjunction>createActor(self -> new Conjunction(self, list(20000L, 2000L, 200L, 20L, 2L), 0L, 0L, responses))
         ).awaitUnchecked();
 
         long startTime = System.currentTimeMillis();
@@ -374,7 +374,7 @@ public class ReasoningTest {
         registry.registerAtomic(1L, pattern ->
                 rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, rules))).awaitUnchecked()
         );
-        Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, list(1L), 0L, responses))).awaitUnchecked();
+        Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, list(1L), 0L, 0L, responses))).awaitUnchecked();
         conjunctive.tell(actor ->
                 actor.executeReceiveRequest(
                         new Request(new Request.Path(conjunctive), list(), list(), list()),
@@ -394,9 +394,9 @@ public class ReasoningTest {
         Actor<ActorRoot> rootActor = Actor.root(eventLoop, ActorRoot::new);
 
         // conjunction1 -> atomic1 -> rule1 -> atomic1
-        registry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<Rule>createActor(self -> new Rule(self, pattern, 1L))).awaitUnchecked());
+        registry.registerRule(list(1L), pattern -> rootActor.ask(actor -> actor.<Rule>createActor(self -> new Rule(self, pattern, 1L, 0L))).awaitUnchecked());
         registry.registerAtomic(1L, pattern -> rootActor.ask(actor -> actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, list(list(1L))))).awaitUnchecked());
-        Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, list(1L), 0L, responses))).awaitUnchecked();
+        Actor<Conjunction> conjunctive = rootActor.ask(actor -> actor.<Conjunction>createActor(self -> new Conjunction(self, list(1L), 0L, 0L, responses))).awaitUnchecked();
 
         long n = 0L + 1L + 1L + 1L + 1;
         for (int i = 0; i < n; i++) {

@@ -23,14 +23,16 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private static final Logger LOG = LoggerFactory.getLogger(AbstractConjunction.class);
 
     private final Long traversalSize;
+    private final Long traversalOffset;
     private final List<Long> conjunction;
     private final List<Actor<Atomic>> plannedAtomics;
 
-    public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize ,final LinkedBlockingQueue<List<Long>> responses) {
+    public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize, Long traversalOffset, final LinkedBlockingQueue<List<Long>> responses) {
         super(self, name, responses);
 
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
+        this.traversalOffset = traversalOffset;
         this.plannedAtomics = new ArrayList<>();
     }
 
@@ -71,7 +73,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     protected ResponseProducer createResponseProducer(final Request request) {
-        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, 0L, 1)).query(conjunction);
+        Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
                 request.constraints(), request.unifiers());

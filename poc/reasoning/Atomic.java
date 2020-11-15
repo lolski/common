@@ -77,7 +77,7 @@ public class Atomic extends ExecutionActor<Atomic> {
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
         for (List<Long> rule : rules) {
-            Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> child(actor -> new Rule(actor, pattern, 1L)));
+            Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> child(actor -> new Rule(actor, pattern, 1L, 0L)));
             ruleActors.add(ruleActor);
         }
     }
