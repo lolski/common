@@ -18,7 +18,7 @@ import static grakn.common.collection.Collections.list;
 public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T>{
     private static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
 
-    String name;
+    protected String name;
     private boolean isInitialised;
     @Nullable
     private final LinkedBlockingQueue<List<Long>> responses;

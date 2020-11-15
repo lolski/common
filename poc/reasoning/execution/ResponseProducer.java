@@ -9,11 +9,13 @@ public class ResponseProducer {
     private final Set<Request> readyDownstreamRequests;
     private final Iterator<List<Long>> traversalProducer;
     private Iterator<Request> nextProducer;
+    private Set<List<Long>> produced;
 
     public ResponseProducer(Iterator<List<Long>> traversalProducer) {
         this.readyDownstreamRequests = new HashSet<>();
         this.traversalProducer = traversalProducer;
         nextProducer = readyDownstreamRequests.iterator();
+        produced = new HashSet<>();
     }
 
     public boolean hasTraversalProducer() {
@@ -22,6 +24,14 @@ public class ResponseProducer {
 
     public Iterator<List<Long>> traversalProducer() {
         return traversalProducer;
+    }
+
+    public void recordProduced(List<Long> answer) {
+        produced.add(answer);
+    }
+
+    public boolean hasProduced(List<Long> answer) {
+        return produced.contains(answer);
     }
 
     public void addReadyDownstream(final Request toDownstream) {

@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static grakn.common.collection.Collections.extend;
 
@@ -14,14 +15,17 @@ import static grakn.common.collection.Collections.extend;
  * Repeatedly calling query() will repeat the same calculation loop in a new iterator
  */
 public class MockTransaction {
+    private static AtomicLong traversalPatternDifferentiator = new AtomicLong(0L);
     private final long computeLength;
     private final Long traversalPattern;
     private final int answerInterval;
 
     public MockTransaction(long computeLength, Long traversalPattern, int answerInterval) {
-        this.computeLength = computeLength + traversalPattern;
-        this.traversalPattern = traversalPattern;
+        long differentiator = traversalPatternDifferentiator.getAndAdd(100);
+        this.computeLength = computeLength + traversalPattern + differentiator;
+        this.traversalPattern = traversalPattern + differentiator;
         this.answerInterval = answerInterval;
+
     }
 
     public Iterator<List<Long>> query(final List<Long> partialAnswer) {
@@ -37,8 +41,9 @@ public class MockTransaction {
             public List<Long> next() {
                 while (count < computeLength) {
                     if (count % answerInterval == 0) {
+                        List<Long> answer = extend(partialAnswer, count);
                         count++;
-                        return extend(partialAnswer, count);
+                        return answer;
                     } else {
                         count++;
                     }

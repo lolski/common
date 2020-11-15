@@ -7,6 +7,8 @@ import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
 import grakn.common.poc.reasoning.mock.MockTransaction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +17,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static grakn.common.collection.Collections.concat;
+
 public class AbstractConjunction<T extends AbstractConjunction<T>> extends ExecutionActor<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractConjunction.class);
+
     private final Long traversalSize;
     private final List<Long> conjunction;
     private final List<Actor<Atomic>> plannedAtomics;
@@ -36,15 +42,21 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
+        List<Long> answer = concat(conjunction, fromDownstream.partialAnswer());
         if (isLast(sender)) {
-            // TODO: deduplicate answer: if the answer that you want to send up is already sent before, retry or send done if all downstreams are exhausted
-            List<Long> newAnswer = fromDownstream.partialAnswer();
-            return Either.second(
-                    new Response.Answer(fromUpstream, newAnswer, fromUpstream.constraints(), fromUpstream.unifiers()));
+            LOG.debug(this.name + ": hasProduced: " + answer);
+
+            if (!responseProducer.hasProduced(answer)) {
+                responseProducer.recordProduced(answer);
+                return Either.second(
+                        new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+            } else {
+                return produce(fromUpstream, responseProducer);
+            }
         } else {
             Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    fromDownstream.partialAnswer(), fromDownstream.constraints(), fromDownstream.unifiers());
+                    answer, fromDownstream.constraints(), fromDownstream.unifiers());
             responseProducer.addReadyDownstream(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -82,11 +94,16 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     }
 
     private Either<Request, Response> produce(Request fromUpstream, ResponseProducer responseProducer) {
-        if (responseProducer.hasTraversalProducer()) {
+        while (responseProducer.hasTraversalProducer()) {
             List<Long> answer = traverseOnce(responseProducer);
-            return Either.second(
-                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
-        } else if (responseProducer.hasReadyDownstreamRequest()) {
+            LOG.debug(this.name + ": hasProduced: " + answer);
+            if (!responseProducer.hasProduced(answer)) {
+                responseProducer.recordProduced(answer);
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+            }
+        }
+
+        if (responseProducer.hasReadyDownstreamRequest()) {
             return Either.first(responseProducer.getReadyDownstreamRequest());
         } else {
             return Either.second(new Response.Exhausted(fromUpstream));

@@ -7,6 +7,8 @@ import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
 import grakn.common.poc.reasoning.mock.MockTransaction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -17,6 +19,7 @@ import java.util.Set;
 
 // TODO settle on a name
 public class Atomic extends ExecutionActor<Atomic> {
+    private static final Logger LOG = LoggerFactory.getLogger(Atomic.class);
 
     private final Long traversalPattern;
     private final long traversalSize;
@@ -35,38 +38,27 @@ public class Atomic extends ExecutionActor<Atomic> {
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        if (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = produceTraversalAnswer(responseProducer);
-            return Either.second(
-                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
-        } else if (responseProducer.hasReadyDownstreamRequest()) {
-            return Either.first(responseProducer.getReadyDownstreamRequest());
-        } else {
-            return Either.second(new Response.Exhausted(fromUpstream));
-        }
+        return produce(fromUpstream, responseProducer);
     }
 
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
-        // TODO: deduplicate answer: if the answer that you want to send up is already sent before, retry or send done if all downstreams are exhausted
         // TODO may combine with partial answers from the fromUpstream message
-        return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
-                fromUpstream.constraints(), fromUpstream.unifiers()));
+        LOG.debug(this.name + ": hasProduced: " + fromDownstream.partialAnswer());
+        if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
+            responseProducer.recordProduced(fromDownstream.partialAnswer());
+            return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
+                    fromUpstream.constraints(), fromUpstream.unifiers()));
+        } else {
+            return produce(fromUpstream, responseProducer);
+        }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
-        if (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = produceTraversalAnswer(responseProducer);
-            return Either.second(
-                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
-        } else if (responseProducer.hasReadyDownstreamRequest()) {
-            return Either.first(responseProducer.getReadyDownstreamRequest());
-        } else {
-            return Either.second(new Response.Exhausted(fromUpstream));
-        }
+        return produce(fromUpstream, responseProducer);
     }
 
     @Override
@@ -90,7 +82,24 @@ public class Atomic extends ExecutionActor<Atomic> {
         }
     }
 
-    private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
+    private Either<Request, Response> produce(Request fromUpstream, ResponseProducer responseProducer) {
+        while (responseProducer.hasTraversalProducer()) {
+            List<Long> answer = traverseOnce(responseProducer);
+            LOG.debug(this.name + ": hasProduced: " + answer);
+            if (!responseProducer.hasProduced(answer)) {
+                responseProducer.recordProduced(answer);
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+            }
+        }
+
+        if (responseProducer.hasReadyDownstreamRequest()) {
+            return Either.first(responseProducer.getReadyDownstreamRequest());
+        } else {
+            return Either.second(new Response.Exhausted(fromUpstream));
+        }
+    }
+
+    private List<Long> traverseOnce(final ResponseProducer responseProducer) {
         Iterator<List<Long>> traversalProducer = responseProducer.traversalProducer();
         return traversalProducer.next();
     }
