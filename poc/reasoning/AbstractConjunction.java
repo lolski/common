@@ -30,15 +30,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        if (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = produceTraversalAnswer(responseProducer);
-            return Either.second(
-                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
-        } else if (responseProducer.hasReadyDownstreamRequest()) {
-            return Either.first(responseProducer.getReadyDownstreamRequest());
-        } else {
-            return Either.second(new Response.Exhausted(fromUpstream));
-        }
+        return produce(fromUpstream, responseProducer);
     }
 
     @Override
@@ -62,15 +54,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
         responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
 
-        if (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = produceTraversalAnswer(responseProducer);
-            return Either.second(
-                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
-        } else if (responseProducer.hasReadyDownstreamRequest()) {
-            return Either.first(responseProducer.getReadyDownstreamRequest());
-        } else {
-            return Either.second(new Response.Exhausted(fromUpstream));
-        }
+        return produce(fromUpstream, responseProducer);
     }
 
     @Override
@@ -97,7 +81,19 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         }
     }
 
-    private List<Long> produceTraversalAnswer(final ResponseProducer responseProducer) {
+    private Either<Request, Response> produce(Request fromUpstream, ResponseProducer responseProducer) {
+        if (responseProducer.hasTraversalProducer()) {
+            List<Long> answer = traverseOnce(responseProducer);
+            return Either.second(
+                    new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+        } else if (responseProducer.hasReadyDownstreamRequest()) {
+            return Either.first(responseProducer.getReadyDownstreamRequest());
+        } else {
+            return Either.second(new Response.Exhausted(fromUpstream));
+        }
+    }
+
+    private List<Long> traverseOnce(final ResponseProducer responseProducer) {
         Iterator<List<Long>> traversalProducer = responseProducer.traversalProducer();
         return traversalProducer.next();
     }
