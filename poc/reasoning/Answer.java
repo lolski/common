@@ -31,10 +31,12 @@ public class Answer {
 
 class Explanation {
     String ruleName;
-    private Map<String, Answer> inferences;
-    // maps rule `when` conjunction sub-patterns to answers
-    private Explanation(final Map<String, Answer> inferences) {
-        this.inferences = inferences;
+    String pattern;
+    Answer answer;
+    private Explanation(String ruleName, String pattern, Answer answer) {
+        this.ruleName = ruleName;
+        this.pattern = pattern;
+        this.answer = answer;
     }
 }
 
