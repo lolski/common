@@ -1,10 +1,7 @@
 package grakn.common.poc.reasoning;
 
-import com.google.common.collect.Iterators;
-
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 
 public class Answer {
 
@@ -47,25 +44,4 @@ class Inference {
         this.answer = answer;
     }
 }
-
-
-/*
-
-A1 Answer [friendship(x,z) and hasname(x,n), x = 1, z = 3, n = -1]
-      |
-{ friendship(x,z): Explanation[mutual-friendship-rule, friendship(x,y) -> A2, friendship(y, z) -> A3] }
-                               /                          \
-A2 Answer [friendship(x,y), x = 1, y = 2]             A3 Answer[friendship(y, z) -> y = 2, z = 3]
-
-
-
-A1 Answer [friendship(x,z) and hasname(x,n), x = 1, z = 3, n = -1]
-      |
-{ friendship(x,z): Explanation[mutual-friendship-rule, friendship(x,y) -> A2, friendship(y, z) -> A3] ,
-  hasname(x,n)   : Explanation[has-name,  ... -> A4]}
-                               /                          \
-A2 Answer [friendship(x,y), x = 1, y = 2]             A3 Answer[friendship(y, z) -> y = 2, z = 3]
-
-
- */
 
