@@ -1,6 +1,6 @@
 package grakn.common.poc.reasoning;
 
-import grakn.common.collection.Pair;
+import com.google.common.collect.Iterators;
 
 import java.util.Map;
 import java.util.stream.Stream;
@@ -11,29 +11,38 @@ public class Answer {
     private int queryId;
 
     Map<String, String> idMap;
-    private final String pattern;
 
-    public Answer(Map<String, String> idMap, String pattern, int queryId) {
+    public Answer(Map<String, String> idMap, int queryId) {
         this.idMap = idMap;
-        this.pattern = pattern;
         this.queryId = queryId;
     }
 
-    public Stream<Map<String, Explanation>> getExplanations() {
+    // TODO how will a stream know in general to notify the backend its done?
+    public Stream<Explanation> getExplanations() {
         return tx.explanations(queryId, idMap);
     }
 
     public boolean isInferred() {
         // conceptually, may not be final impl
-        return getExplanations() != null;
+        return getExplanations().findAny().isPresent();
     }
 }
 
+// can be assembled by the conjunction as it receives answers from the atomic. Will nest "inference" objects
+// coming back from downstream
 class Explanation {
+    Map<String, Inference> inferences;
+    public Explanation(Map<String, Inference> inferences) {
+        this.inferences = inferences;
+    }
+}
+
+// eg could be built by an atomic receiving an answer from downstream
+class Inference {
     String ruleName;
     String pattern;
     Answer answer;
-    private Explanation(String ruleName, String pattern, Answer answer) {
+    private Inference(String ruleName, String pattern, Answer answer) {
         this.ruleName = ruleName;
         this.pattern = pattern;
         this.answer = answer;
