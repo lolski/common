@@ -1,7 +1,8 @@
 package grakn.common.poc.reasoning.execution;
 
-import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.Explanation;
 
+import javax.annotation.Nullable;
 import java.util.List;
 
 public interface Response {
@@ -24,14 +25,18 @@ public interface Response {
         private final List<Object> constraints;
         private final List<Object> unifiers;
 
+        private final Explanation explanation;
+
         public Answer(final Request sourceRequest,
                       final List<Long> partialAnswer,
                       final List<Object> constraints,
-                      final List<Object> unifiers) {
+                      final List<Object> unifiers,
+                      @Nullable Explanation explanation) {
             this.sourceRequest = sourceRequest;
             this.partialAnswer = partialAnswer;
             this.constraints = constraints;
             this.unifiers = unifiers;
+            this.explanation = explanation;
         }
 
         @Override
@@ -61,6 +66,7 @@ public interface Response {
         public Response.Answer asAnswer() {
             return this;
         }
+
     }
 
     class Exhausted implements Response {

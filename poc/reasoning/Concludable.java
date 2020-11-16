@@ -11,27 +11,33 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class Conjunctable extends ExecutionActor<Conjunctable> {
-    private static final Logger LOG = LoggerFactory.getLogger(Conjunctable.class);
+import static grakn.common.collection.Collections.map;
+import static grakn.common.collection.Collections.pair;
+import static grakn.common.collection.Collections.set;
+
+public class Concludable extends ExecutionActor<Concludable> {
+    private static final Logger LOG = LoggerFactory.getLogger(Concludable.class);
 
     private final Long traversalPattern;
     private final long traversalSize;
     private final List<List<Long>> rules;
-    private final List<Actor<Rule>> ruleActors;
+    private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
 
-    public Conjunctable(final Actor<Conjunctable> self, final Long traversalPattern, final List<List<Long>> rules, final long traversalSize) {
-        super(self, Conjunctable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
+    public Concludable(final Actor<Concludable> self, final Long traversalPattern, final List<List<Long>> rules, final long traversalSize) {
+        super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
         this.rules = rules;
-        ruleActors = new ArrayList<>();
+        ruleActorSources = new HashMap<>();
         triggered = new HashSet<>();
     }
 
@@ -43,13 +49,23 @@ public class Conjunctable extends ExecutionActor<Conjunctable> {
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
+        Actor<? extends ExecutionActor<?>> ruleSender = fromDownstream.sourceRequest().receiver();
+        List<Long> rulePattern = ruleActorSources.get(ruleSender);
+        Response.Answer.Inference inference = new Response.Answer.Inference(fromDownstream, rulePattern.toString(), null);
+        Map<String, Set<Response.Answer.Inference>> inferences = map(pair(traversalPattern.toString(), set(inference)));
+
         // TODO may combine with partial answers from the fromUpstream message
         LOG.debug("{}: hasProduced: {}", name, fromDownstream.partialAnswer());
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
+            Response.Answer.Explanation explanation = new Response.Answer.Explanation(inferences);
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
-                    fromUpstream.constraints(), fromUpstream.unifiers()));
+                    fromUpstream.constraints(), fromUpstream.unifiers(), explanation));
         } else {
+
+            // TODO record explanation that is not being sent upstream in recorder actor
+            // TODO this will have something to do with the request message (ie its path) and the `inferences` object
+
             return produceMessage(fromUpstream, responseProducer);
         }
     }
@@ -77,7 +93,7 @@ public class Conjunctable extends ExecutionActor<Conjunctable> {
     protected void initialiseDownstreamActors(Registry registry) {
         for (List<Long> rule : rules) {
             Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> Actor.create(self().eventLoopGroup(), actor -> new Rule(actor, pattern, 1L, 0L)));
-            ruleActors.add(ruleActor);
+            ruleActorSources.put(ruleActor, rule);
         }
     }
 
@@ -87,7 +103,8 @@ public class Conjunctable extends ExecutionActor<Conjunctable> {
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+                Response.Answer.Explanation explanation = new Response.Answer.Explanation(map());
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), explanation));
             }
         }
 
@@ -100,7 +117,7 @@ public class Conjunctable extends ExecutionActor<Conjunctable> {
 
     private void registerDownstreamRules(final ResponseProducer responseProducer, final Request.Path path, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
-        for (Actor<Rule> ruleActor : ruleActors) {
+        for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
             Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers);
             responseProducer.addDownstreamProducer(toDownstream);
         }

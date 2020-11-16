@@ -14,10 +14,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.concat;
 import static grakn.common.collection.Collections.copy;
+import static grakn.common.collection.Collections.map;
+import static grakn.common.collection.Collections.pair;
+import static grakn.common.collection.Collections.set;
 
 public class AbstractConjunction<T extends AbstractConjunction<T>> extends ExecutionActor<T> {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractConjunction.class);
@@ -25,7 +30,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private final Long traversalSize;
     private final Long traversalOffset;
     private final List<Long> conjunction;
-    private final List<Actor<Conjunctable>> plannedAtomics;
+    private final List<Actor<Concludable>> plannedAtomics;
 
     public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize, Long traversalOffset, final LinkedBlockingQueue<List<Long>> responses) {
         super(self, name, responses);
@@ -56,7 +61,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
                 return produceMessage(fromUpstream, responseProducer);
             }
         } else {
-            Actor<Conjunctable> nextPlannedDownstream = nextPlannedDownstream(sender);
+            Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
                     answer, fromDownstream.constraints(), fromDownstream.unifiers());
             responseProducer.addDownstreamProducer(downstreamRequest);
@@ -87,8 +92,8 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         List<Long> planned = copy(conjunction);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
-            Actor<Conjunctable> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
-                    Actor.create(self().eventLoopGroup(), (newActor) -> new Conjunctable(newActor, pattern, Arrays.asList(), 5L)));
+            Actor<Concludable> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
+                    Actor.create(self().eventLoopGroup(), (newActor) -> new Concludable(newActor, pattern, Arrays.asList(), 5L)));
             plannedAtomics.add(atomicActor);
         }
     }
@@ -114,7 +119,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         return plannedAtomics.get(plannedAtomics.size() - 1).equals(actor);
     }
 
-    private Actor<Conjunctable> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
+    private Actor<Concludable> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
         return plannedAtomics.get(plannedAtomics.indexOf(actor) + 1);
     }
 

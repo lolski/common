@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.function.Function;
 
 public class Registry {
-    private HashMap<Long, Actor<Conjunctable>> atomicActors;
+    private HashMap<Long, Actor<Concludable>> atomicActors;
     private HashMap<List<Long>, Actor<Rule>> ruleActors;
 
     public Registry() {
@@ -15,7 +15,7 @@ public class Registry {
         this.ruleActors = new HashMap<>();
     }
 
-    public synchronized Actor<Conjunctable> registerAtomic(Long pattern, Function<Long, Actor<Conjunctable>> actorConstructor) {
+    public synchronized Actor<Concludable> registerAtomic(Long pattern, Function<Long, Actor<Concludable>> actorConstructor) {
         return atomicActors.computeIfAbsent(pattern, actorConstructor);
     }
 
