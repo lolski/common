@@ -25,25 +25,25 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // create atomic actors first to control answer size
+        // create atomic
         long atomicPattern = 0L;
         long atomicTraversalSize = 5L;
         List<List<Long>> atomicRules = list();
         registry.registerAtomic(atomicPattern, pattern ->
                 Actor.create(elg, self -> new Atomic(self, pattern, atomicTraversalSize, atomicRules)));
 
+        // create conjunction
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 5L;
         Actor<Conjunction> conjunction = Actor.create(elg, self ->
                 new Conjunction(self, conjunctionPattern, conjunctionTraversalSize, -10L, responses));
 
-        assertAnswer(registry, responses, atomicTraversalSize + conjunctionTraversalSize, conjunction);
-        Thread.sleep(20);
+        assertResponsesSync(registry, responses, atomicTraversalSize + conjunctionTraversalSize, conjunction);
     }
 
-    private void assertAnswer(Registry registry, LinkedBlockingQueue<List<Long>> responses, long answers, Actor<Conjunction> conjunction) throws InterruptedException {
+    private void assertResponsesSync(Registry registry, LinkedBlockingQueue<List<Long>> responses, long answers, Actor<Conjunction> conjunction) throws InterruptedException {
         long startTime = System.currentTimeMillis();
-        long n = answers + 1; //total number of traversal answers
+        long n = answers + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), list()), registry));
@@ -59,24 +59,36 @@ public class ReasoningTest {
     }
 
     @Test
-    public void doubleAtomicActor() throws InterruptedException {
+    public void doubleAtomicActors() throws InterruptedException {
         Registry registry = new Registry();
-
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // create atomic actors first to control answer size
-        registry.registerAtomic(2L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, 2L, list())));
+        // create atomic1
+        long atomic1Pattern = 2L;
+        long atomic1TraversalSize = 2L;
+        List<List<Long>> atomic1Rules = list();
+        registry.registerAtomic(atomic1Pattern, pattern ->
+                        Actor.create(elg, self -> new Atomic(self, pattern, atomic1TraversalSize, atomic1Rules)));
 
-        registry.registerAtomic(20L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, 2L, list())));
+        // create atomic2
+        long atomic2Pattern = 20L;
+        long atomic2TraversalSize = 2L;
+        registry.registerAtomic(atomic2Pattern, pattern ->
+                Actor.create(elg, self -> new Atomic(self, pattern, atomic2TraversalSize, list())));
 
+        // create conjunction
+        List<Long> conjunctionPattern = list(atomic2Pattern, atomic1Pattern);
+        long conjunctionTraversalSize = 0L;
         Actor<Conjunction> conjunction =
-                Actor.create(elg, self -> new Conjunction(self, list(20L, 2L), 0L, 0L, responses));
+                Actor.create(elg, self -> new Conjunction(self, conjunctionPattern, conjunctionTraversalSize, 0L, responses));
 
+        assertResponses(registry, responses, conjunction, conjunctionTraversalSize + (atomic2TraversalSize * atomic1TraversalSize));
+    }
+
+    private void assertResponses(Registry registry, LinkedBlockingQueue<List<Long>> responses, Actor<Conjunction> conjunction, long answers) throws InterruptedException {
         long startTime = System.currentTimeMillis();
-        long n = 0L + (2L * 2L) + 1; //total number of traversal answers, plus one expected DONE (-1 answer)
+        long n = answers + 1; //total number of traversal answers, plus one expected Exhausted (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(
