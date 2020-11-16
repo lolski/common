@@ -33,7 +33,7 @@ public class ReasoningTest {
         long conjunctionTraversalSize = 5L;
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, -10L, responses, elg);
 
-        assertResponsesSync(registry, responses, atomicTraversalSize + conjunctionTraversalSize, conjunction);
+        assertResponsesSync(conjunction, atomicTraversalSize + conjunctionTraversalSize, responses, registry);
     }
 
     @Test
@@ -54,7 +54,7 @@ public class ReasoningTest {
         long conjunctionTraversalSize = 0L;
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize,0L,  responses, elg);
 
-        assertResponses(registry, responses, conjunction, conjunctionTraversalSize + (atomic2TraversalSize * atomic1TraversalSize));
+        assertResponses(conjunction, conjunctionTraversalSize + (atomic2TraversalSize * atomic1TraversalSize), responses, registry);
     }
 
     @Test
@@ -75,7 +75,7 @@ public class ReasoningTest {
         long conjunctionTraversalSize = 0L;
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize,0L,  responses, elg);
 
-        assertResponses(registry, responses, conjunction, conjunctionTraversalSize + (atomic1TraversalSize * atomic2TraversalSize));
+        assertResponses(conjunction, conjunctionTraversalSize + (atomic1TraversalSize * atomic2TraversalSize), responses, registry);
     }
 
     @Test
@@ -103,7 +103,7 @@ public class ReasoningTest {
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize;
-        assertResponses(registry, responses, conjunction, answerCount);
+        assertResponses(conjunction, answerCount, responses, registry);
     }
 
     @Test
@@ -112,42 +112,30 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // create atomic actors first to control answer size
-//        registry.registerAtomic(-2L, pattern ->
-//                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 1L)));
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
         registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
-//        registry.registerRule(list(-2L), pattern ->
-//                        Actor.create(elg, self -> new Rule(self, pattern, 1L, 0L)));
         List<Long> rulePattern = list(atomic1Pattern);
         long ruleTraversalSize = 1L;
         long ruleTraversalOffset = -10L;
         registerRule(rulePattern, ruleTraversalSize, ruleTraversalOffset, registry, elg);
 
-//        registry.registerAtomic(2L, pattern ->
-//                        Actor.create(elg, self -> new Atomic(self, pattern, list(list(-2L)), 1L)));
         long atomic2Pattern = 2L;
         long atomic2TraversalSize = 1L;
         registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
 
-//        registry.registerAtomic(20L, pattern ->
-//                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 1L)));
         long atomic3Pattern = 20L;
         long atomic3TraversalSize = 1L;
         registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
-//        Actor<Conjunction> conjunction =
-//                Actor.create(elg, self -> new Conjunction(self, list(20L, 2L), 0L, 0L, responses));
         List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
-//        long answerCount = 0L + (1 * 1) + (1 * 2); //total number of traversal answers, plus one expected DONE (-1 answer)
-        long answerCount = conjunctionTraversalSize + atomic3TraversalSize + (atomic3TraversalSize * (atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize));
-        assertResponses(registry, responses, conjunction, answerCount);
+        long answerCount = conjunctionTraversalSize + (atomic3TraversalSize * (atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize));
+        assertResponses(conjunction, answerCount, responses, registry);
     }
 
     @Test
@@ -156,35 +144,25 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // create atomic actors first to control answer size
-        registry.registerAtomic(2L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 2L)));
+        long atomic1Pattern = 2L;
+        long atomic1TraversalSize = 2L;
+        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
-        registry.registerAtomic(20L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 2L)));
+        long atomic2Pattern = 20L;
+        long atomic2TraversalSize = 2L;
+        registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
-        registry.registerAtomic(200L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 2L)));
+        long atomic3Pattern = 200L;
+        long atomic3TraversalSize = 2L;
+        registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
-        Actor<Conjunction> conjunction =
-                Actor.create(elg, self -> new Conjunction(self, list(200L, 20L, 2L), 0L, 0L, responses));
-        long startTime = System.currentTimeMillis();
-        long n = 0L + (2L * 2L * 2L) + 1;
-        for (int i = 0; i < n; i++) {
-            conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
-        }
-        for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertFalse(answer.isEmpty());
-        }
-        assertEquals(responses.take(), list());
-        System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(responses.isEmpty());
+        List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern, atomic1Pattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = 0L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = conjunctionTraversalSize + (atomic3TraversalSize * atomic2TraversalSize * atomic1TraversalSize);
+        assertResponses(conjunction, answerCount, responses, registry);
     }
 
     @Test
@@ -193,43 +171,33 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // create atomic actors first to control answer size
-        registry.registerAtomic(2L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 10L)));
+        long atomic1Pattern = 2L;
+        long atomic1TraversalSize = 10L;
+        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
-        registry.registerAtomic(20L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 10L)));
+        long atomic2Pattern = 20L;
+        long atomic2TraversalSize = 10L;
+        registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
-        registry.registerAtomic(200L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 10L)));
+        long atomic3Pattern = 200L;
+        long atomic3TraversalSize = 10L;
+        registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
-        registry.registerAtomic(2000L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 10L)));
+        long atomic4Pattern = 2000L;
+        long atomic4TraversalSize = 10L;
+        registerAtomic(atomic4Pattern, list(), atomic4TraversalSize, registry, elg);
 
-        registry.registerAtomic(20000L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 10L)));
+        long atomic5Pattern = 20000L;
+        long atomic5TraversalSize = 10L;
+        registerAtomic(atomic5Pattern, list(), atomic5TraversalSize, registry, elg);
 
-        Actor<Conjunction> conjunction =
-                Actor.create(elg, self -> new Conjunction(self, list(20000L, 2000L, 200L, 20L, 2L), 0L, 0L, responses));
-        long startTime = System.currentTimeMillis();
-        long n = 0L + (10L * 10L * 10L * 10L * 10L) + 1;
-        System.out.println("Number of requests: " + n);
-        for (int i = 0; i < n; i++) {
-            conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
-        }
-        System.out.println("Starting to take");
-        for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertTrue(!answer.isEmpty());
-        }
-        assertEquals(responses.take(), list());
-        System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        assertTrue(responses.isEmpty());
+        List<Long> conjunctionPattern = list(atomic5Pattern, atomic4Pattern, atomic3Pattern, atomic2Pattern, atomic1Pattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = 0L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = conjunctionTraversalSize + (atomic5TraversalSize * atomic4TraversalSize * atomic3TraversalSize * atomic2TraversalSize * atomic1TraversalSize);
+        assertResponses(conjunction, answerCount, responses, registry);
     }
 
     @Test
@@ -238,15 +206,22 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        List<List<Long>> rules = new ArrayList<>();
-        for (long i = 2L; i < 1000_000L; i++) {
-            rules.add(list(i));
-        }
         long start = System.currentTimeMillis();
-        registry.registerAtomic(1L, pattern ->
-                Actor.create(elg, self -> new Atomic(self, pattern, rules, 1L))
-        );
-        Actor<Conjunction> conjunction = Actor.create(elg, self -> new Conjunction(self, list(1L), 0L, 0L, responses));
+
+        long atomicPattern = 1L;
+        List<List<Long>> atomicRulePatterns = new ArrayList<>();
+        for (long i = 2L; i < 1000_000L; i++) {
+            List<Long> pattern = list(i);
+            atomicRulePatterns.add(pattern);
+        }
+        long atomicTraversalSize = 1L;
+        registerAtomic(atomicPattern, atomicRulePatterns, atomicTraversalSize, registry, elg);
+
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = 0L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
         conjunction.tell(actor ->
                 actor.executeReceiveRequest(
                         new Request(new Request.Path(conjunction), list(), list(), list()),
@@ -254,7 +229,9 @@ public class ReasoningTest {
                 )
         );
         responses.take();
+
         long elapsed = System.currentTimeMillis() - start;
+
         System.out.println("elapsed = " + elapsed);
     }
 
@@ -264,26 +241,23 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // conjunction1 -> atomic1 -> rule1 -> atomic1
-        registry.registerRule(list(1L), pattern -> Actor.create(elg, self -> new Rule(self, pattern, 1L, 0L)));
-        registry.registerAtomic(1L, pattern -> Actor.create(elg, self -> new Atomic(self, pattern, list(list(1L)), 1L)));
-        Actor<Conjunction> conjunction = Actor.create(elg, self -> new Conjunction(self, list(1L), 0L, 0L, responses));
+        long atomicPattern = 1L;
 
-        long n = 0L + 1L + 1L + 1L + 1;
-        for (int i = 0; i < n; i++) {
-            conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
-        }
-        for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertTrue(!answer.isEmpty());
-        }
-        assertEquals(responses.take(), list());
-        assertTrue(responses.isEmpty());
+        List<Long> rulePattern = list(atomicPattern);
+        long ruleTraversalSize = 1L;
+        long ruleTraversalOffset = 0L;
+        registerRule(rulePattern, ruleTraversalSize, ruleTraversalOffset, registry, elg);
+
+        long atomic1TraversalSize = 1L;
+        registerAtomic(atomicPattern, list(rulePattern), atomic1TraversalSize, registry, elg);
+
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = 0L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = conjunctionTraversalSize + atomic1TraversalSize + ruleTraversalSize + atomic1TraversalSize;
+        assertResponses(conjunction, answerCount, responses, registry);
     }
 
     @Test
@@ -292,28 +266,19 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        registry.registerAtomic(1L, pattern ->
+        long traversalSize = 100L;
 
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 100L))
-        );
-        Actor<Conjunction> conjunction =
-                Actor.create(elg, self -> new Conjunction(self, list(1L), 100L, 1L, responses));
+        long atomicPattern = 1L;
+        long atomicTraversalSize = traversalSize;
+        registerAtomic(atomicPattern, list(), atomicTraversalSize, registry, elg);
 
-        long n = 100L + 1L;
-        for (int i = 0; i < n; i++) {
-            conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
-        }
-        for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertTrue(!answer.isEmpty());
-        }
-        assertEquals(responses.take(), list());
-        assertTrue(responses.isEmpty());
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = traversalSize;
+        long conjunctionTraversalOffset = 1L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = traversalSize;
+        assertResponses(conjunction, answerCount, responses, registry);
     }
 
     private void registerAtomic(long pattern, List<List<Long>> rules, long traversalSize, Registry registry, EventLoopGroup elg) {
@@ -328,7 +293,7 @@ public class ReasoningTest {
         registry.registerRule(pattern, p -> Actor.create(elg, self -> new Rule(self, p, traversalSize, traversalOffset)));
     }
 
-    private void assertResponses(Registry registry, LinkedBlockingQueue<List<Long>> responses, Actor<Conjunction> conjunction, long answerCount) throws InterruptedException {
+    private void assertResponses(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<List<Long>> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number of traversal answers, plus one expected Exhausted (-1 answer)
         for (int i = 0; i < n; i++) {
@@ -350,7 +315,7 @@ public class ReasoningTest {
         assertTrue(responses.isEmpty());
     }
 
-    private void assertResponsesSync(Registry registry, LinkedBlockingQueue<List<Long>> responses, long answerCount, Actor<Conjunction> conjunction) throws InterruptedException {
+    private void assertResponsesSync(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<List<Long>> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {

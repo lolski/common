@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.concat;
+import static grakn.common.collection.Collections.copy;
 
 public class AbstractConjunction<T extends AbstractConjunction<T>> extends ExecutionActor<T> {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractConjunction.class);
@@ -84,9 +85,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
-        List<Long> planned = new ArrayList<>(conjunction);
-        Collections.reverse(planned);
-        planned = Collections.unmodifiableList(planned);
+        List<Long> planned = copy(conjunction);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
             Actor<Atomic> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
