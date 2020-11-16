@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-// TODO settle on a name
 public class Conjunctable extends ExecutionActor<Conjunctable> {
     private static final Logger LOG = LoggerFactory.getLogger(Conjunctable.class);
 
