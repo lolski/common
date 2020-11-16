@@ -22,26 +22,31 @@ public class ReasoningTest {
     @Test
     public void singleAtomicActor() throws InterruptedException {
         Registry registry = new Registry();
-
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         // create atomic actors first to control answer size
-        registry.registerAtomic(0L, pattern ->
-                        Actor.create(elg, self -> new Atomic(self, pattern, 5L, list())));
+        long atomicPattern = 0L;
+        long atomicTraversalSize = 5L;
+        List<List<Long>> atomicRules = list();
+        registry.registerAtomic(atomicPattern, pattern ->
+                Actor.create(elg, self -> new Atomic(self, pattern, atomicTraversalSize, atomicRules)));
 
-        Actor<Conjunction> conjunction =
-                Actor.create(elg, self -> new Conjunction(self, list(0L), 5L, -10L, responses));
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = 5L;
+        Actor<Conjunction> conjunction = Actor.create(elg, self ->
+                new Conjunction(self, conjunctionPattern, conjunctionTraversalSize, -10L, responses));
 
+        assertAnswer(registry, responses, atomicTraversalSize + conjunctionTraversalSize, conjunction);
+        Thread.sleep(20);
+    }
+
+    private void assertAnswer(Registry registry, LinkedBlockingQueue<List<Long>> responses, long answers, Actor<Conjunction> conjunction) throws InterruptedException {
         long startTime = System.currentTimeMillis();
-        long n = 5L + 5L + 1; //total number of traversal answers
+        long n = answers + 1; //total number of traversal answers
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
+                    actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), list()), registry));
             List<Long> answer = responses.take();
             System.out.println(answer);
             if (i < n - 1) {
@@ -51,7 +56,6 @@ public class ReasoningTest {
             }
         }
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
-        Thread.sleep(20);
     }
 
     @Test
