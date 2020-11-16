@@ -113,39 +113,28 @@ public class ReasoningTest {
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         // create atomic actors first to control answer size
-//        registry.registerAtomic(-2L, pattern ->
-//                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 1L)));
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
         registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
-//        registry.registerRule(list(-2L), pattern ->
-//                        Actor.create(elg, self -> new Rule(self, pattern, 1L, 0L)));
         List<Long> rulePattern = list(atomic1Pattern);
         long ruleTraversalSize = 1L;
         long ruleTraversalOffset = -10L;
         registerRule(rulePattern, ruleTraversalSize, ruleTraversalOffset, registry, elg);
 
-//        registry.registerAtomic(2L, pattern ->
-//                        Actor.create(elg, self -> new Atomic(self, pattern, list(list(-2L)), 1L)));
         long atomic2Pattern = 2L;
         long atomic2TraversalSize = 1L;
         registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
 
-//        registry.registerAtomic(20L, pattern ->
-//                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 1L)));
         long atomic3Pattern = 20L;
         long atomic3TraversalSize = 1L;
         registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
-//        Actor<Conjunction> conjunction =
-//                Actor.create(elg, self -> new Conjunction(self, list(20L, 2L), 0L, 0L, responses));
         List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
-//        long answerCount = 0L + (1 * 1) + (1 * 2); //total number of traversal answers, plus one expected DONE (-1 answer)
         long answerCount = conjunctionTraversalSize + atomic3TraversalSize + (atomic3TraversalSize * (atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize));
         assertResponses(registry, responses, conjunction, answerCount);
     }
