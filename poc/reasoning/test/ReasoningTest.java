@@ -233,26 +233,23 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // conjunction1 -> atomic1 -> rule1 -> atomic1
-        registry.registerRule(list(1L), pattern -> Actor.create(elg, self -> new Rule(self, pattern, 1L, 0L)));
-        registry.registerAtomic(1L, pattern -> Actor.create(elg, self -> new Atomic(self, pattern, list(list(1L)), 1L)));
-        Actor<Conjunction> conjunction = Actor.create(elg, self -> new Conjunction(self, list(1L), 0L, 0L, responses));
+        long atomicPattern = 1L;
 
-        long n = 0L + 1L + 1L + 1L + 1;
-        for (int i = 0; i < n; i++) {
-            conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
-        }
-        for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertTrue(!answer.isEmpty());
-        }
-        assertEquals(responses.take(), list());
-        assertTrue(responses.isEmpty());
+        List<Long> rulePattern = list(atomicPattern);
+        long ruleTraversalSize = 1L;
+        long ruleTraversalOffset = 0L;
+        registerRule(rulePattern, ruleTraversalSize, ruleTraversalOffset, registry, elg);
+
+        long atomic1TraversalSize = 1L;
+        registerAtomic(atomicPattern, list(rulePattern), atomic1TraversalSize, registry, elg);
+
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = 0L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = conjunctionTraversalSize + atomic1TraversalSize + ruleTraversalSize + atomic1TraversalSize;
+        assertResponses(registry, responses, conjunction, answerCount);
     }
 
     @Test
