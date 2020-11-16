@@ -53,7 +53,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
      *
      */
     public void executeReceiveRequest(final Request fromUpstream, final Registry registry) {
-        LOG.debug(name + ": Receiving a new Request from upstream: " + fromUpstream);
+        LOG.debug("{}: Receiving a new Request from upstream: {}", name, fromUpstream);
         if (!isInitialised) {
             LOG.debug(name + ": initialising downstream actors");
             initialiseDownstreamActors(registry);
@@ -61,7 +61,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         }
 
         ResponseProducer responseProducer = responseProducers.computeIfAbsent(fromUpstream, key -> {
-            LOG.debug(name + ": Creating a new ResponseProducer for the given Request: " + fromUpstream);
+            LOG.debug("{}: Creating a new ResponseProducer for the given Request: {}", name, fromUpstream);
             return createResponseProducer(fromUpstream);
         });
         Either<Request, Response> action = receiveRequest(fromUpstream, responseProducer);
@@ -70,7 +70,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     }
 
     void executeReceiveAnswer(final Response.Answer fromDownstream, final Registry registry) {
-        LOG.debug(name + ": Receiving a new Answer from downstream: " + fromDownstream);
+        LOG.debug("{}: Receiving a new Answer from downstream: {}", name, fromDownstream);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
@@ -81,7 +81,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     }
 
     void executeReceiveExhausted(final Response.Exhausted fromDownstream, final Registry registry) {
-        LOG.debug(name + ": Receiving a new Exhausted from downstream: " + fromDownstream);
+        LOG.debug("{}: Receiving a new Exhausted from downstream: {}", name, fromDownstream);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
         ResponseProducer responseProducer = responseProducers.get(fromUpstream);
@@ -99,7 +99,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
      *
      * */
     private void requestFromDownstream(final Request request, final Request fromUpstream, final Registry registry) {
-        LOG.debug(name + ": Sending a new Request in order to request for an answer from downstream: " + request);
+        LOG.debug("{} : Sending a new Request in order to request for an answer from downstream: {}", name, request);
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
         Actor<? extends ExecutionActor<?>> receiver = request.receiver();
@@ -107,23 +107,23 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     }
 
     private void respondToUpstream(final Response response, final Registry registry) {
-        LOG.debug(name + ": Sending a new Response to respond with an answer to upstream: " + response);
+        LOG.debug("{}: Sending a new Response to respond with an answer to upstream: {}", name, response);
         Actor<? extends ExecutionActor<?>> receiver = response.sourceRequest().sender();
         if (receiver == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             if (response.isAnswer()) {
-                LOG.debug(name + ": Writing a new Response.Answer to output queue");
+                LOG.debug("{}: Writing a new Response.Answer to output queue", name);
                 responses.add(response.asAnswer().partialAnswer());
             } else {
-                LOG.debug(name + ": Writing a new Response.Exhausted to output queue");
+                LOG.debug("{}: Writing a new Response.Exhausted to output queue", name);
                 responses.add(list());
             }
         } else {
             if (response.isAnswer()) {
-                LOG.debug(name + ": Sending a new Response.Answer to upstream");
+                LOG.debug("{} : Sending a new Response.Answer to upstream", name);
                 receiver.tell(actor -> actor.executeReceiveAnswer(response.asAnswer(), registry));
             } else if (response.isExhausted()) {
-                LOG.debug(name + ": Sending a new Response.Exhausted to upstream");
+                LOG.debug("{}: Sending a new Response.Exhausted to upstream", name);
                 receiver.tell(actor -> actor.executeReceiveExhausted(response.asExhausted(), registry));
             } else {
                 throw new RuntimeException(("Unknown message type " + response.getClass().getSimpleName()));

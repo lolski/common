@@ -45,7 +45,7 @@ public class Atomic extends ExecutionActor<Atomic> {
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
         // TODO may combine with partial answers from the fromUpstream message
-        LOG.debug(name + ": hasProduced: " + fromDownstream.partialAnswer());
+        LOG.debug("{}: hasProduced: {}", name, fromDownstream.partialAnswer());
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
@@ -85,7 +85,7 @@ public class Atomic extends ExecutionActor<Atomic> {
     private Either<Request, Response> produceMessage(Request fromUpstream, ResponseProducer responseProducer) {
         while (responseProducer.hasTraversalProducer()) {
             List<Long> answer = responseProducer.traversalProducer().next();
-            LOG.debug(name + ": hasProduced: " + answer);
+            LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));

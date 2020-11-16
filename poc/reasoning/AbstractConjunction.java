@@ -47,7 +47,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
         List<Long> answer = concat(conjunction, fromDownstream.partialAnswer());
         if (isLast(sender)) {
-            LOG.debug(name + ": hasProduced: " + answer);
+            LOG.debug("{}: hasProduced: {}", name, answer);
 
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
@@ -97,7 +97,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private Either<Request, Response> produceMessage(Request fromUpstream, ResponseProducer responseProducer) {
         while (responseProducer.hasTraversalProducer()) {
             List<Long> answer = responseProducer.traversalProducer().next();
-            LOG.debug(name + ": hasProduced: " + answer);
+            LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
