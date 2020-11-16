@@ -90,7 +90,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
             Actor<Atomic> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
-                    child((newActor) -> new Atomic(newActor, pattern, 5L, Arrays.asList())));
+                    Actor.create(self().eventLoopGroup(), (newActor) -> new Atomic(newActor, pattern, 5L, Arrays.asList())));
             plannedAtomics.add(atomicActor);
         }
     }
