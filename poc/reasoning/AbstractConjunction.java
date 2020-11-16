@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -26,7 +25,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private final Long traversalSize;
     private final Long traversalOffset;
     private final List<Long> conjunction;
-    private final List<Actor<Atomic>> plannedAtomics;
+    private final List<Actor<Conjunctable>> plannedAtomics;
 
     public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize, Long traversalOffset, final LinkedBlockingQueue<List<Long>> responses) {
         super(self, name, responses);
@@ -57,7 +56,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
                 return produceMessage(fromUpstream, responseProducer);
             }
         } else {
-            Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
+            Actor<Conjunctable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
                     answer, fromDownstream.constraints(), fromDownstream.unifiers());
             responseProducer.addDownstreamProducer(downstreamRequest);
@@ -88,8 +87,8 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         List<Long> planned = copy(conjunction);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
-            Actor<Atomic> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
-                    Actor.create(self().eventLoopGroup(), (newActor) -> new Atomic(newActor, pattern, Arrays.asList(), 5L)));
+            Actor<Conjunctable> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
+                    Actor.create(self().eventLoopGroup(), (newActor) -> new Conjunctable(newActor, pattern, Arrays.asList(), 5L)));
             plannedAtomics.add(atomicActor);
         }
     }
@@ -115,7 +114,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         return plannedAtomics.get(plannedAtomics.size() - 1).equals(actor);
     }
 
-    private Actor<Atomic> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
+    private Actor<Conjunctable> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
         return plannedAtomics.get(plannedAtomics.indexOf(actor) + 1);
     }
 

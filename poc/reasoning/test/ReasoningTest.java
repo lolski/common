@@ -2,7 +2,7 @@ package grakn.common.poc.reasoning.test;
 
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
-import grakn.common.poc.reasoning.Atomic;
+import grakn.common.poc.reasoning.Conjunctable;
 import grakn.common.poc.reasoning.Conjunction;
 import grakn.common.poc.reasoning.Registry;
 import grakn.common.poc.reasoning.Rule;
@@ -282,7 +282,7 @@ public class ReasoningTest {
     }
 
     private void registerAtomic(long pattern, List<List<Long>> rules, long traversalSize, Registry registry, EventLoopGroup elg) {
-        registry.registerAtomic(pattern, p -> Actor.create(elg, self -> new Atomic(self, p, rules, traversalSize)));
+        registry.registerAtomic(pattern, p -> Actor.create(elg, self -> new Conjunctable(self, p, rules, traversalSize)));
     }
 
     private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<List<Long>> responses, EventLoopGroup elg) {
