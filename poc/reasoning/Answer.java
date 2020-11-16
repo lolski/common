@@ -3,6 +3,7 @@ package grakn.common.poc.reasoning;
 import com.google.common.collect.Iterators;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class Answer {
@@ -17,22 +18,20 @@ public class Answer {
         this.queryId = queryId;
     }
 
-    // TODO how will a stream know in general to notify the backend its done?
-    public Stream<Explanation> getExplanations() {
-        return tx.explanations(queryId, idMap);
+    public Explanation getExplanation() {
+        return tx.explanation(queryId, idMap);
     }
 
     public boolean isInferred() {
-        // conceptually, may not be final impl
-        return getExplanations().findAny().isPresent();
+        return getExplanation() != null;
     }
 }
 
 // can be assembled by the conjunction as it receives answers from the atomic. Will nest "inference" objects
 // coming back from downstream
 class Explanation {
-    Map<String, Inference> inferences;
-    public Explanation(Map<String, Inference> inferences) {
+    Map<String, Set<Inference>> inferences;
+    public Explanation(Map<String, Set<Inference>> inferences) {
         this.inferences = inferences;
     }
 }
