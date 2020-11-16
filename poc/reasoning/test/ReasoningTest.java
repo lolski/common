@@ -258,28 +258,19 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        registry.registerAtomic(1L, pattern ->
+        long traversalSize = 100L;
 
-                        Actor.create(elg, self -> new Atomic(self, pattern, list(), 100L))
-        );
-        Actor<Conjunction> conjunction =
-                Actor.create(elg, self -> new Conjunction(self, list(1L), 100L, 1L, responses));
+        long atomicPattern = 1L;
+        long atomicTraversalSize = traversalSize;
+        registerAtomic(atomicPattern, list(), atomicTraversalSize, registry, elg);
 
-        long n = 100L + 1L;
-        for (int i = 0; i < n; i++) {
-            conjunction.tell(actor ->
-                    actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
-                            registry
-                    )
-            );
-        }
-        for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertTrue(!answer.isEmpty());
-        }
-        assertEquals(responses.take(), list());
-        assertTrue(responses.isEmpty());
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = traversalSize;
+        long conjunctionTraversalOffset = 1L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = traversalSize;
+        assertResponses(registry, responses, conjunction, answerCount);
     }
 
     private void registerAtomic(long pattern, List<List<Long>> rules, long traversalSize, Registry registry, EventLoopGroup elg) {
