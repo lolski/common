@@ -6,24 +6,16 @@ import java.util.List;
 import java.util.Set;
 
 public class ResponseProducer {
-    private final Set<Request> readyDownstreamRequests;
+    private final Set<List<Long>> produced;
     private final Iterator<List<Long>> traversalProducer;
-    private Iterator<Request> nextProducer;
-    private Set<List<Long>> produced;
+    private final Set<Request> downstreamProducer;
+    private Iterator<Request> downstreamProducerSelector;
 
     public ResponseProducer(Iterator<List<Long>> traversalProducer) {
-        this.readyDownstreamRequests = new HashSet<>();
-        this.traversalProducer = traversalProducer;
-        nextProducer = readyDownstreamRequests.iterator();
         produced = new HashSet<>();
-    }
-
-    public boolean hasTraversalProducer() {
-        return traversalProducer.hasNext();
-    }
-
-    public Iterator<List<Long>> traversalProducer() {
-        return traversalProducer;
+        this.traversalProducer = traversalProducer;
+        downstreamProducer = new HashSet<>();
+        downstreamProducerSelector = downstreamProducer.iterator();
     }
 
     public void recordProduced(List<Long> answer) {
@@ -34,26 +26,34 @@ public class ResponseProducer {
         return produced.contains(answer);
     }
 
-    public void addReadyDownstream(final Request toDownstream) {
-        assert !(readyDownstreamRequests.contains(toDownstream)) : "ready downstream requests already contains this request";
-
-        readyDownstreamRequests.add(toDownstream);
-        nextProducer = readyDownstreamRequests.iterator();
+    public boolean hasTraversalProducer() {
+        return traversalProducer.hasNext();
     }
 
-    public Request getReadyDownstreamRequest() {
-        if (!nextProducer.hasNext()) nextProducer = readyDownstreamRequests.iterator();
-        return nextProducer.next();
+    public Iterator<List<Long>> traversalProducer() {
+        return traversalProducer;
     }
 
-    public boolean hasReadyDownstreamRequest() {
-        return !readyDownstreamRequests.isEmpty();
+    public boolean hasDownstreamProducer() {
+        return !downstreamProducer.isEmpty();
     }
 
-    public void removeReadyDownstream(final Request request) {
-        boolean removed = readyDownstreamRequests.remove(request);
+    public Request nextDownstreamProducer() {
+        if (!downstreamProducerSelector.hasNext()) downstreamProducerSelector = downstreamProducer.iterator();
+        return downstreamProducerSelector.next();
+    }
+
+    public void addDownstreamProducer(final Request request) {
+        assert !(downstreamProducer.contains(request)) : "downstream answer producer already contains this request";
+
+        downstreamProducer.add(request);
+        downstreamProducerSelector = downstreamProducer.iterator();
+    }
+
+    public void removeDownstreamProducer(final Request request) {
+        boolean removed = downstreamProducer.remove(request);
         // only update the iterator when removing an element, to avoid resetting and reusing first request too often
         // note: this is a large performance win when processing large batches of requests
-        if (removed) nextProducer = readyDownstreamRequests.iterator();
+        if (removed) downstreamProducerSelector = downstreamProducer.iterator();
     }
 }

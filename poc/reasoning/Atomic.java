@@ -38,27 +38,27 @@ public class Atomic extends ExecutionActor<Atomic> {
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        return produce(fromUpstream, responseProducer);
+        return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
         // TODO may combine with partial answers from the fromUpstream message
-        LOG.debug(this.name + ": hasProduced: " + fromDownstream.partialAnswer());
+        LOG.debug(name + ": hasProduced: " + fromDownstream.partialAnswer());
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
                     fromUpstream.constraints(), fromUpstream.unifiers()));
         } else {
-            return produce(fromUpstream, responseProducer);
+            return produceMessage(fromUpstream, responseProducer);
         }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
-        responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
-        return produce(fromUpstream, responseProducer);
+        responseProducer.removeDownstreamProducer(fromDownstream.sourceRequest());
+        return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
@@ -82,33 +82,28 @@ public class Atomic extends ExecutionActor<Atomic> {
         }
     }
 
-    private Either<Request, Response> produce(Request fromUpstream, ResponseProducer responseProducer) {
+    private Either<Request, Response> produceMessage(Request fromUpstream, ResponseProducer responseProducer) {
         while (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = traverseOnce(responseProducer);
-            LOG.debug(this.name + ": hasProduced: " + answer);
+            List<Long> answer = responseProducer.traversalProducer().next();
+            LOG.debug(name + ": hasProduced: " + answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
             }
         }
 
-        if (responseProducer.hasReadyDownstreamRequest()) {
-            return Either.first(responseProducer.getReadyDownstreamRequest());
+        if (responseProducer.hasDownstreamProducer()) {
+            return Either.first(responseProducer.nextDownstreamProducer());
         } else {
             return Either.second(new Response.Exhausted(fromUpstream));
         }
-    }
-
-    private List<Long> traverseOnce(final ResponseProducer responseProducer) {
-        Iterator<List<Long>> traversalProducer = responseProducer.traversalProducer();
-        return traversalProducer.next();
     }
 
     private void registerDownstreamRules(final ResponseProducer responseProducer, final Request.Path path, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActors) {
             Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers);
-            responseProducer.addReadyDownstream(toDownstream);
+            responseProducer.addDownstreamProducer(toDownstream);
         }
     }
 

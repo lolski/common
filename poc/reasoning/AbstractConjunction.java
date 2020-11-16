@@ -39,7 +39,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
-        return produce(fromUpstream, responseProducer);
+        return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
@@ -47,29 +47,29 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
         List<Long> answer = concat(conjunction, fromDownstream.partialAnswer());
         if (isLast(sender)) {
-            LOG.debug(this.name + ": hasProduced: " + answer);
+            LOG.debug(name + ": hasProduced: " + answer);
 
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
                 return Either.second(
                         new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
             } else {
-                return produce(fromUpstream, responseProducer);
+                return produceMessage(fromUpstream, responseProducer);
             }
         } else {
             Actor<Atomic> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
                     answer, fromDownstream.constraints(), fromDownstream.unifiers());
-            responseProducer.addReadyDownstream(downstreamRequest);
+            responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
     }
 
     @Override
     public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
-        responseProducer.removeReadyDownstream(fromDownstream.sourceRequest());
+        responseProducer.removeDownstreamProducer(fromDownstream.sourceRequest());
 
-        return produce(fromUpstream, responseProducer);
+        return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
@@ -78,7 +78,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
                 request.constraints(), request.unifiers());
-        responseProducer.addReadyDownstream(toDownstream);
+        responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
     }
@@ -94,26 +94,21 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         }
     }
 
-    private Either<Request, Response> produce(Request fromUpstream, ResponseProducer responseProducer) {
+    private Either<Request, Response> produceMessage(Request fromUpstream, ResponseProducer responseProducer) {
         while (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = traverseOnce(responseProducer);
-            LOG.debug(this.name + ": hasProduced: " + answer);
+            List<Long> answer = responseProducer.traversalProducer().next();
+            LOG.debug(name + ": hasProduced: " + answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
             }
         }
 
-        if (responseProducer.hasReadyDownstreamRequest()) {
-            return Either.first(responseProducer.getReadyDownstreamRequest());
+        if (responseProducer.hasDownstreamProducer()) {
+            return Either.first(responseProducer.nextDownstreamProducer());
         } else {
             return Either.second(new Response.Exhausted(fromUpstream));
         }
-    }
-
-    private List<Long> traverseOnce(final ResponseProducer responseProducer) {
-        Iterator<List<Long>> traversalProducer = responseProducer.traversalProducer();
-        return traversalProducer.next();
     }
 
     private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {
