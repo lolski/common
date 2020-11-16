@@ -27,7 +27,7 @@ public class Atomic extends ExecutionActor<Atomic> {
     private final List<Actor<Rule>> ruleActors;
     private final Set<RuleTrigger> triggered;
 
-    public Atomic(final Actor<Atomic> self, final Long traversalPattern, final long traversalSize, final List<List<Long>> rules) {
+    public Atomic(final Actor<Atomic> self, final Long traversalPattern, final List<List<Long>> rules, final long traversalSize) {
         super(self, Atomic.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;

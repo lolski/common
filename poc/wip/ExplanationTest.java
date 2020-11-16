@@ -41,7 +41,7 @@ public class ExplanationTest {
         // create atomic actors first to control answer size
         registry.registerAtomic(10L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 1L, Arrays.asList()))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, Arrays.asList(), 1L))
                 ).awaitUnchecked()
         );
         registry.registerRule(list(10L), pattern ->
@@ -51,7 +51,7 @@ public class ExplanationTest {
         );
         registry.registerAtomic(2010L, pattern ->
                 rootActor.ask(actor ->
-                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, 0L, Arrays.asList(Arrays.asList(10L))))
+                        actor.<Atomic>createActor(self -> new Atomic(self, pattern, Arrays.asList(Arrays.asList(10L)), 0L))
                 ).awaitUnchecked()
         );
 //        Actor<ConjunctiveActor> conjunctive = rootActor.ask(actor ->
