@@ -112,7 +112,6 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        // create atomic actors first to control answer size
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
         registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
@@ -207,15 +206,22 @@ public class ReasoningTest {
         LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
-        List<List<Long>> rules = new ArrayList<>();
-        for (long i = 2L; i < 1000_000L; i++) {
-            rules.add(list(i));
-        }
         long start = System.currentTimeMillis();
-        registry.registerAtomic(1L, pattern ->
-                Actor.create(elg, self -> new Atomic(self, pattern, rules, 1L))
-        );
-        Actor<Conjunction> conjunction = Actor.create(elg, self -> new Conjunction(self, list(1L), 0L, 0L, responses));
+
+        long atomicPattern = 1L;
+        List<List<Long>> atomicRulePatterns = new ArrayList<>();
+        for (long i = 2L; i < 1000_000L; i++) {
+            List<Long> pattern = list(i);
+            atomicRulePatterns.add(pattern);
+        }
+        long atomicTraversalSize = 1L;
+        registerAtomic(atomicPattern, atomicRulePatterns, atomicTraversalSize, registry, elg);
+
+        List<Long> conjunctionPattern = list(atomicPattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = 0L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
         conjunction.tell(actor ->
                 actor.executeReceiveRequest(
                         new Request(new Request.Path(conjunction), list(), list(), list()),
@@ -223,7 +229,9 @@ public class ReasoningTest {
                 )
         );
         responses.take();
+
         long elapsed = System.currentTimeMillis() - start;
+
         System.out.println("elapsed = " + elapsed);
     }
 
