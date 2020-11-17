@@ -8,19 +8,16 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static grakn.common.collection.Collections.list;
-
-public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T>{
+public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T> {
     private static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
 
     protected String name;
     private boolean isInitialised;
     @Nullable
-    private final LinkedBlockingQueue<List<Long>> responses;
+    private final LinkedBlockingQueue<Response> responses;
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
@@ -28,7 +25,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         this(self, name, null);
     }
 
-    public ExecutionActor(final Actor<T> self, final String name, @Nullable LinkedBlockingQueue<List<Long>> responses) {
+    public ExecutionActor(final Actor<T> self, final String name, @Nullable LinkedBlockingQueue<Response> responses) {
         super(self);
         this.name = name;
         isInitialised = false;
@@ -111,13 +108,8 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         Actor<? extends ExecutionActor<?>> receiver = response.sourceRequest().sender();
         if (receiver == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
-            if (response.isAnswer()) {
-                LOG.debug("{}: Writing a new Response.Answer to output queue", name);
-                responses.add(response.asAnswer().partialAnswer());
-            } else {
-                LOG.debug("{}: Writing a new Response.Exhausted to output queue", name);
-                responses.add(list());
-            }
+            LOG.debug("{}: Writing a new Response to output queue", name);
+            responses.add(response);
         } else {
             if (response.isAnswer()) {
                 LOG.debug("{} : Sending a new Response.Answer to upstream", name);

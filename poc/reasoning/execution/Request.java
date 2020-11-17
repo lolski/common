@@ -44,6 +44,7 @@ public class Request {
     public Actor<? extends ExecutionActor<?>> receiver() {
         return path.path.get(path.path.size() - 1);
     }
+
     public List<Long> partialAnswer() {
         return partialAnswer;
     }

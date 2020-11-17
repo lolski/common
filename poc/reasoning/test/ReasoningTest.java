@@ -7,6 +7,7 @@ import grakn.common.poc.reasoning.Conjunction;
 import grakn.common.poc.reasoning.Registry;
 import grakn.common.poc.reasoning.Rule;
 import grakn.common.poc.reasoning.execution.Request;
+import grakn.common.poc.reasoning.execution.Response;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -23,7 +24,7 @@ public class ReasoningTest {
     @Test
     public void singleAtomicActor() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomicPattern = 0L;
@@ -40,7 +41,7 @@ public class ReasoningTest {
     @Test
     public void doubleAtomicActors() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = 2L;
@@ -61,7 +62,7 @@ public class ReasoningTest {
     @Test
     public void filteringAtomicActor() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = 2L;
@@ -82,7 +83,7 @@ public class ReasoningTest {
     @Test
     public void simpleRule() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = -2L;
@@ -110,7 +111,7 @@ public class ReasoningTest {
     @Test
     public void atomicChainWithRule() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = -2L;
@@ -142,7 +143,7 @@ public class ReasoningTest {
     @Test
     public void shallowRerequest() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = 2L;
@@ -169,7 +170,7 @@ public class ReasoningTest {
     @Test
     public void deepRerequest() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = 2L;
@@ -204,7 +205,7 @@ public class ReasoningTest {
     @Test
     public void bulkActorCreation() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long start = System.currentTimeMillis();
@@ -239,7 +240,7 @@ public class ReasoningTest {
     @Test
     public void loopTermination() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomicPattern = 1L;
@@ -264,7 +265,7 @@ public class ReasoningTest {
     @Test
     public void deduplication() throws InterruptedException {
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long traversalSize = 100L;
@@ -300,7 +301,7 @@ public class ReasoningTest {
          */
 
         Registry registry = new Registry();
-        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
 
         long atomic1Pattern = 10L;
@@ -330,7 +331,7 @@ public class ReasoningTest {
                             registry
                     )
             );
-            List<Long> answer = responses.take();
+            Response answer = responses.take();
         }
     }
 
@@ -339,7 +340,7 @@ public class ReasoningTest {
         registry.registerAtomic(pattern, p -> Actor.create(elg, self -> new Concludable(self, p, rules, traversalSize)));
     }
 
-    private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<List<Long>> responses, EventLoopGroup elg) {
+    private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<Response> responses, EventLoopGroup elg) {
         return Actor.create(elg, self -> new Conjunction(self, pattern, traversalSize, traversalOffset, responses));
     }
 
@@ -347,7 +348,7 @@ public class ReasoningTest {
         registry.registerRule(pattern, p -> Actor.create(elg, self -> new Rule(self, p, traversalSize, traversalOffset)));
     }
 
-    private void assertResponses(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<List<Long>> responses, Registry registry) throws InterruptedException {
+    private void assertResponses(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number of traversal answers, plus one expected Exhausted (-1 answer)
         for (int i = 0; i < n; i++) {
@@ -360,27 +361,27 @@ public class ReasoningTest {
         }
 
         for (int i = 0; i < n - 1; i++) {
-            List<Long> answer = responses.take();
-            assertTrue(!answer.isEmpty());
+            Response answer = responses.take();
+            assertTrue(answer.isAnswer());
         }
-        assertEquals(responses.take(), list());
+        assertTrue(responses.take().isExhausted());
 //        Thread.sleep(1000); // enable for debugging to ensure equivalent debug vs normal execution
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));
         assertTrue(responses.isEmpty());
     }
 
-    private void assertResponsesSync(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<List<Long>> responses, Registry registry) throws InterruptedException {
+    private void assertResponsesSync(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), list(), null), registry));
-            List<Long> answer = responses.take();
+            Response answer = responses.take();
             System.out.println(answer);
             if (i < n - 1) {
-                assertTrue(!answer.isEmpty());
+                assertTrue(answer.isAnswer());
             } else {
-                assertTrue(answer.isEmpty());
+                assertTrue(answer.isExhausted());
             }
         }
         System.out.println("Time : " + (System.currentTimeMillis() - startTime));

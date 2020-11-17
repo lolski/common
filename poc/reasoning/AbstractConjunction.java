@@ -33,7 +33,8 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedAtomics;
 
-    public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize, Long traversalOffset, final LinkedBlockingQueue<List<Long>> responses) {
+    public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize,
+                               Long traversalOffset, final LinkedBlockingQueue<Response> responses) {
         super(self, name, responses);
 
         this.conjunction = conjunction;
@@ -59,12 +60,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
                 // take the explanation from the fromDownstream and copy it
                 // insert it as the explanation for this response - conjunctions do not create their own explanations
-                Explanation explanation;
-                if (fromDownstream.explanation() == null) {
-                    explanation = null;
-                } else {
-                    explanation = fromDownstream.explanation().copy();
-                }
+                Explanation explanation = fromDownstream.explanation().copy();
 
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
                         fromUpstream.unifiers(), conjunction.toString(), explanation));
@@ -115,7 +111,8 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), conjunction.toString(), null));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
+                        fromUpstream.unifiers(), conjunction.toString(), Explanation.EMPTY));
             }
         }
 

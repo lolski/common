@@ -105,7 +105,8 @@ public class Concludable extends ExecutionActor<Concludable> {
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), traversalPattern.toString(), null));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
+                        fromUpstream.unifiers(), traversalPattern.toString(), new Explanation(map())));
             }
         }
 
@@ -119,7 +120,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private void registerDownstreamRules(final ResponseProducer responseProducer, final Request.Path path, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
-            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers, new Explanation(map()));
+            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers, Explanation.EMPTY);
             responseProducer.addDownstreamProducer(toDownstream);
         }
     }

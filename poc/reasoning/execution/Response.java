@@ -1,6 +1,5 @@
 package grakn.common.poc.reasoning.execution;
 
-import javax.annotation.Nullable;
 import java.util.List;
 
 public interface Response {
@@ -31,7 +30,7 @@ public interface Response {
                       final List<Object> constraints,
                       final List<Object> unifiers,
                       final String patternAnswered,
-                      @Nullable Explanation explanation) {
+                      Explanation explanation) {
             this.sourceRequest = sourceRequest;
             this.partialAnswer = partialAnswer;
             this.constraints = constraints;

@@ -5,11 +5,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static grakn.common.collection.Collections.map;
+
 /*
 Carry explanations across actors
 NOTE: always shallow copy on sending an answer, as requests messages are shared
  */
 public class Explanation {
+
+    public static final Explanation EMPTY = new Explanation(map());
 
     private final Map<String, Set<Inference>> inferences;
 
