@@ -77,6 +77,10 @@ public class Request {
         return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialAnswer + ")";
     }
 
+    public Explanation partialExplanation() {
+        return partialExplanation;
+    }
+
     public static class Path {
         final List<Actor<? extends ExecutionActor<?>>> path;
 

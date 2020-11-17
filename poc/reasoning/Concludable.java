@@ -11,7 +11,6 @@ import grakn.common.poc.reasoning.mock.MockTransaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -21,7 +20,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import static grakn.common.collection.Collections.map;
-import static grakn.common.collection.Collections.pair;
 import static grakn.common.collection.Collections.set;
 
 public class Concludable extends ExecutionActor<Concludable> {
@@ -54,15 +52,17 @@ public class Concludable extends ExecutionActor<Concludable> {
 
         List<Long> rulePattern = ruleActorSources.get(ruleSender);
         Explanation.Inference inference = new Explanation.Inference(fromDownstream, rulePattern.toString(), null);
-        Map<String, Set<Explanation.Inference>> inferences = map(pair(traversalPattern.toString(), set(inference)));
 
         // TODO may combine with partial answers from the fromUpstream message
+
         LOG.debug("{}: hasProduced: {}", name, fromDownstream.partialAnswer());
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
-            Explanation explanation = new Explanation(inferences);
+            // update partial explanation provided from upstream to carry explanations sideways
+            Explanation partialExplanation = fromUpstream.partialExplanation().copy();
+            partialExplanation.addInference(traversalPattern.toString(), set(inference));
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
-                    fromUpstream.constraints(), fromUpstream.unifiers(), explanation));
+                    fromUpstream.constraints(), fromUpstream.unifiers(), traversalPattern.toString(), partialExplanation));
         } else {
 
             // TODO record explanation that is not being sent upstream in recorder actor
@@ -105,7 +105,7 @@ public class Concludable extends ExecutionActor<Concludable> {
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), null));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), traversalPattern.toString(), null));
             }
         }
 

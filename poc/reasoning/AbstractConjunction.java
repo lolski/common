@@ -67,7 +67,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
                 }
 
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
-                        fromUpstream.unifiers(), explanation));
+                        fromUpstream.unifiers(), conjunction.toString(), explanation));
             } else {
                 return produceMessage(fromUpstream, responseProducer);
             }
@@ -115,7 +115,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), null));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), conjunction.toString(), null));
             }
         }
 

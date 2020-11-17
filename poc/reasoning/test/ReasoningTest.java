@@ -10,6 +10,7 @@ import grakn.common.poc.reasoning.execution.Request;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -224,7 +225,7 @@ public class ReasoningTest {
 
         conjunction.tell(actor ->
                 actor.executeReceiveRequest(
-                        new Request(new Request.Path(conjunction), list(), list(), list()),
+                        new Request(new Request.Path(conjunction), list(), list(), list(), null),
                         registry
                 )
         );
@@ -281,6 +282,59 @@ public class ReasoningTest {
         assertResponses(conjunction, answerCount, responses, registry);
     }
 
+
+
+    @Test
+    public void explanationTest() throws InterruptedException {
+        /*
+
+        when {
+            $x isa person, has age 10;
+        }, then {
+            $x has birth-year 2010;
+        };
+
+        query:
+        match $x has birth-year 2010;
+
+         */
+
+        Registry registry = new Registry();
+        LinkedBlockingQueue<List<Long>> responses = new LinkedBlockingQueue<>();
+        EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+
+        long atomic1Pattern = 10L;
+        long atomic1TraversalSize = 1L;
+        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+
+        List<Long> rulePattern = list(10L);
+        long ruleTraversalSize = 0L;
+        long ruleTraversalOffset = 0L;
+        registerRule(rulePattern, ruleTraversalSize, ruleTraversalOffset, registry, elg);
+
+        long atomic2Pattern = 2010L;
+        long atomic2TraversalSize = 0L;
+        registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
+
+        List<Long> conjunctionPattern = list(atomic2Pattern);
+        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalOffset = -10L;
+        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+
+        long answerCount = conjunctionTraversalSize + atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize;
+
+        for (int i = 0; i < answerCount; i++) {
+            conjunction.tell(actor ->
+                    actor.executeReceiveRequest(
+                            new Request(new Request.Path(conjunction), list(), list(), list(), null),
+                            registry
+                    )
+            );
+            List<Long> answer = responses.take();
+        }
+    }
+
+
     private void registerAtomic(long pattern, List<List<Long>> rules, long traversalSize, Registry registry, EventLoopGroup elg) {
         registry.registerAtomic(pattern, p -> Actor.create(elg, self -> new Concludable(self, p, rules, traversalSize)));
     }
@@ -299,7 +353,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list()),
+                            new Request(new Request.Path(conjunction), list(), list(), list(), null),
                             registry
                     )
             );
@@ -320,7 +374,7 @@ public class ReasoningTest {
         long n = answerCount + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
-                    actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), list()), registry));
+                    actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), list(), null), registry));
             List<Long> answer = responses.take();
             System.out.println(answer);
             if (i < n - 1) {

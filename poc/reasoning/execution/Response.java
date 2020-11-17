@@ -23,17 +23,20 @@ public interface Response {
         private final List<Object> constraints;
         private final List<Object> unifiers;
 
+        private String patternAnswered;
         private final Explanation explanation;
 
         public Answer(final Request sourceRequest,
                       final List<Long> partialAnswer,
                       final List<Object> constraints,
                       final List<Object> unifiers,
+                      final String patternAnswered,
                       @Nullable Explanation explanation) {
             this.sourceRequest = sourceRequest;
             this.partialAnswer = partialAnswer;
             this.constraints = constraints;
             this.unifiers = unifiers;
+            this.patternAnswered = patternAnswered;
             this.explanation = explanation;
         }
 
@@ -69,6 +72,17 @@ public interface Response {
             return this;
         }
 
+        @Override
+        public String toString() {
+            return "\nAnswer{" +
+                    "\nsourceRequest=" + sourceRequest +
+                    ",\n partialAnswer=" + partialAnswer +
+                    ",\n constraints=" + constraints +
+                    ",\n unifiers=" + unifiers +
+                    ",\n patternAnswered=" + patternAnswered +
+                    ",\n explanation=" + explanation +
+                    '}';
+        }
     }
 
     class Exhausted implements Response {
