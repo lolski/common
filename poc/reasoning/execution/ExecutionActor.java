@@ -21,11 +21,11 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
-    public ExecutionActor(final Actor<T> self, final String name) {
+    public ExecutionActor(Actor<T> self, String name) {
         this(self, name, null);
     }
 
-    public ExecutionActor(final Actor<T> self, final String name, @Nullable LinkedBlockingQueue<Response> responses) {
+    public ExecutionActor(Actor<T> self, String name, @Nullable LinkedBlockingQueue<Response> responses) {
         super(self);
         this.name = name;
         isInitialised = false;
@@ -34,22 +34,22 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         requestRouter = new HashMap<>();
     }
 
-    protected abstract ResponseProducer createResponseProducer(final Request fromUpstream);
+    protected abstract ResponseProducer createResponseProducer(Request fromUpstream);
 
     protected abstract void initialiseDownstreamActors(Registry registry);
 
-    protected abstract Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer);
+    protected abstract Either<Request, Response> receiveRequest(Request fromUpstream, ResponseProducer responseProducer);
 
-    protected abstract Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, final ResponseProducer responseProducer);
+    protected abstract Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream, ResponseProducer responseProducer);
 
-    protected abstract Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer);
+    protected abstract Either<Request, Response> receiveExhausted(Request fromUpstream, Response.Exhausted fromDownstream, ResponseProducer responseProducer);
 
     /*
      *
      * Handlers for messages sent into the execution actor that are dispatched via the actor model.
      *
      */
-    public void executeReceiveRequest(final Request fromUpstream, final Registry registry) {
+    public void executeReceiveRequest(Request fromUpstream, Registry registry) {
         LOG.debug("{}: Receiving a new Request from upstream: {}", name, fromUpstream);
         if (!isInitialised) {
             LOG.debug(name + ": initialising downstream actors");
@@ -66,7 +66,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         else respondToUpstream(action.second(), registry);
     }
 
-    void executeReceiveAnswer(final Response.Answer fromDownstream, final Registry registry) {
+    void executeReceiveAnswer(Response.Answer fromDownstream, Registry registry) {
         LOG.debug("{}: Receiving a new Answer from downstream: {}", name, fromDownstream);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
@@ -77,7 +77,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         else respondToUpstream(action.second(), registry);
     }
 
-    void executeReceiveExhausted(final Response.Exhausted fromDownstream, final Registry registry) {
+    void executeReceiveExhausted(Response.Exhausted fromDownstream, Registry registry) {
         LOG.debug("{}: Receiving a new Exhausted from downstream: {}", name, fromDownstream);
         Request sentDownstream = fromDownstream.sourceRequest();
         Request fromUpstream = requestRouter.get(sentDownstream);
@@ -95,7 +95,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
      * Helper method private to this class.
      *
      * */
-    private void requestFromDownstream(final Request request, final Request fromUpstream, final Registry registry) {
+    private void requestFromDownstream(Request request, Request fromUpstream, Registry registry) {
         LOG.debug("{} : Sending a new Request in order to request for an answer from downstream: {}", name, request);
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
@@ -103,7 +103,7 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         receiver.tell(actor -> actor.executeReceiveRequest(request, registry));
     }
 
-    private void respondToUpstream(final Response response, final Registry registry) {
+    private void respondToUpstream(Response response, Registry registry) {
         LOG.debug("{}: Sending a new Response to respond with an answer to upstream: {}", name, response);
         Actor<? extends ExecutionActor<?>> receiver = response.sourceRequest().sender();
         if (receiver == null) {

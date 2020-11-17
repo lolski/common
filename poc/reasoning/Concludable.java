@@ -31,7 +31,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
 
-    public Concludable(final Actor<Concludable> self, final Long traversalPattern, final List<List<Long>> rules, final long traversalSize) {
+    public Concludable(Actor<Concludable> self, Long traversalPattern, List<List<Long>> rules, long traversalSize) {
         super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
         this.traversalPattern = traversalPattern;
         this.traversalSize = traversalSize;
@@ -41,12 +41,12 @@ public class Concludable extends ExecutionActor<Concludable> {
     }
 
     @Override
-    public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
+    public Either<Request, Response> receiveRequest(Request fromUpstream, ResponseProducer responseProducer) {
         return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
-    public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
+    public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> ruleSender = fromDownstream.sourceRequest().receiver();
 
@@ -73,13 +73,13 @@ public class Concludable extends ExecutionActor<Concludable> {
     }
 
     @Override
-    public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
+    public Either<Request, Response> receiveExhausted(Request fromUpstream, Response.Exhausted fromDownstream, ResponseProducer responseProducer) {
         responseProducer.removeDownstreamProducer(fromDownstream.sourceRequest());
         return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
-    protected ResponseProducer createResponseProducer(final Request request) {
+    protected ResponseProducer createResponseProducer(Request request) {
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalPattern, 1)).query(request.partialAnswer());
         ResponseProducer responseProducer = new ResponseProducer(traversal);
 
@@ -117,8 +117,8 @@ public class Concludable extends ExecutionActor<Concludable> {
         }
     }
 
-    private void registerDownstreamRules(final ResponseProducer responseProducer, final Request.Path path, final List<Long> partialAnswers,
-                                         final List<Object> constraints, final List<Object> unifiers) {
+    private void registerDownstreamRules(ResponseProducer responseProducer, Request.Path path, List<Long> partialAnswers,
+                                         List<Object> constraints, List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
             Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers, Explanation.EMPTY);
             responseProducer.addDownstreamProducer(toDownstream);

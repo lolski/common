@@ -26,7 +26,7 @@ public class Explanation {
         return new Explanation(copiedInferences);
     }
 
-    public void addInference(final String pattern, final Set<Inference> inference) {
+    public void addInference(String pattern, Set<Inference> inference) {
         assert !inferences.containsKey(pattern) : "cannot overwrite prexisting pattern inferences with new ones";
         inferences.put(pattern, inference);
     }

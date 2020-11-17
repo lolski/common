@@ -25,11 +25,11 @@ public interface Response {
         private String patternAnswered;
         private final Explanation explanation;
 
-        public Answer(final Request sourceRequest,
-                      final List<Long> partialAnswer,
-                      final List<Object> constraints,
-                      final List<Object> unifiers,
-                      final String patternAnswered,
+        public Answer(Request sourceRequest,
+                      List<Long> partialAnswer,
+                      List<Object> constraints,
+                      List<Object> unifiers,
+                      String patternAnswered,
                       Explanation explanation) {
             this.sourceRequest = sourceRequest;
             this.partialAnswer = partialAnswer;
@@ -87,7 +87,7 @@ public interface Response {
     class Exhausted implements Response {
         private final Request sourceRequest;
 
-        public Exhausted(final Request sourceRequest) {
+        public Exhausted(Request sourceRequest) {
             this.sourceRequest = sourceRequest;
         }
 

@@ -43,14 +43,14 @@ public class ResponseProducer {
         return downstreamProducerSelector.next();
     }
 
-    public void addDownstreamProducer(final Request request) {
+    public void addDownstreamProducer(Request request) {
         assert !(downstreamProducer.contains(request)) : "downstream answer producer already contains this request";
 
         downstreamProducer.add(request);
         downstreamProducerSelector = downstreamProducer.iterator();
     }
 
-    public void removeDownstreamProducer(final Request request) {
+    public void removeDownstreamProducer(Request request) {
         boolean removed = downstreamProducer.remove(request);
         // only update the iterator when removing an element, to avoid resetting and reusing first request too often
         // note: this is a large performance win when processing large batches of requests

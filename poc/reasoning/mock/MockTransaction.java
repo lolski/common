@@ -26,7 +26,7 @@ public class MockTransaction {
 
     }
 
-    public Iterator<List<Long>> query(final List<Long> partialAnswer) {
+    public Iterator<List<Long>> query(List<Long> partialAnswer) {
         return new Iterator<List<Long>>() {
             long count = traversalPattern;
 

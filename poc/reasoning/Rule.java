@@ -6,8 +6,8 @@ import java.util.List;
 
 // TODO unify and materialise in receiveAnswer
 public class Rule extends AbstractConjunction<Rule> {
-    public Rule(final Actor<Rule> self, final List<Long> when,
-                final Long traversalSize, final Long traversalOffset) {
+    public Rule(Actor<Rule> self, List<Long> when,
+                Long traversalSize, Long traversalOffset) {
         super(self, Rule.class.getSimpleName() + "(pattern:" + when + ")", when, traversalSize, traversalOffset, null);
     }
 }

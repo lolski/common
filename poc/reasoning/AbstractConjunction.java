@@ -33,8 +33,8 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedAtomics;
 
-    public AbstractConjunction(final Actor<T> self, String name, final List<Long> conjunction, final Long traversalSize,
-                               Long traversalOffset, final LinkedBlockingQueue<Response> responses) {
+    public AbstractConjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
+                               Long traversalOffset, LinkedBlockingQueue<Response> responses) {
         super(self, name, responses);
 
         this.conjunction = conjunction;
@@ -44,12 +44,12 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     }
 
     @Override
-    public Either<Request, Response> receiveRequest(final Request fromUpstream, final ResponseProducer responseProducer) {
+    public Either<Request, Response> receiveRequest(Request fromUpstream, ResponseProducer responseProducer) {
         return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
-    public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream, ResponseProducer responseProducer) {
+    public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
         List<Long> answer = concat(conjunction, fromDownstream.partialAnswer());
         if (isLast(sender)) {
@@ -77,14 +77,14 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     }
 
     @Override
-    public Either<Request, Response> receiveExhausted(final Request fromUpstream, final Response.Exhausted fromDownstream, final ResponseProducer responseProducer) {
+    public Either<Request, Response> receiveExhausted(Request fromUpstream, Response.Exhausted fromDownstream, ResponseProducer responseProducer) {
         responseProducer.removeDownstreamProducer(fromDownstream.sourceRequest());
 
         return produceMessage(fromUpstream, responseProducer);
     }
 
     @Override
-    protected ResponseProducer createResponseProducer(final Request request) {
+    protected ResponseProducer createResponseProducer(Request request) {
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
