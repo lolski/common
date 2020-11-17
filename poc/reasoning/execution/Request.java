@@ -15,15 +15,18 @@ public class Request {
     private final List<Long> partialAnswer;
     private final List<Object> constraints;
     private final List<Object> unifiers;
+    private final Explanation partialExplanation;
 
     public Request(Path path,
                    List<Long> partialAnswer,
                    List<Object> constraints,
-                   List<Object> unifiers) {
+                   List<Object> unifiers,
+                   Explanation partialExplanation) {
         this.path = path;
         this.partialAnswer = partialAnswer;
         this.constraints = constraints;
         this.unifiers = unifiers;
+        this.partialExplanation = partialExplanation;
     }
 
     public Path path() {

@@ -3,6 +3,7 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.execution.ExecutionActor;
+import grakn.common.poc.reasoning.execution.Explanation;
 import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
@@ -55,15 +56,25 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(
-                        new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+
+                // take the explanation from the fromDownstream and copy it
+                // insert it as the explanation for this response - conjunctions do not create their own explanations
+                Explanation explanation;
+                if (fromDownstream.explanation() == null) {
+                    explanation = null;
+                } else {
+                    explanation = fromDownstream.explanation().copy();
+                }
+
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
+                        fromUpstream.unifiers(), explanation));
             } else {
                 return produceMessage(fromUpstream, responseProducer);
             }
         } else {
             Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    answer, fromDownstream.constraints(), fromDownstream.unifiers());
+                    answer, fromDownstream.constraints(), fromDownstream.unifiers(), fromDownstream.explanation());
             responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -81,7 +92,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
-                request.constraints(), request.unifiers());
+                request.constraints(), request.unifiers(), new Explanation(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
@@ -104,7 +115,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers()));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), null));
             }
         }
 

@@ -3,6 +3,7 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.execution.ExecutionActor;
+import grakn.common.poc.reasoning.execution.Explanation;
 import grakn.common.poc.reasoning.execution.Request;
 import grakn.common.poc.reasoning.execution.Response;
 import grakn.common.poc.reasoning.execution.ResponseProducer;
@@ -50,15 +51,16 @@ public class Concludable extends ExecutionActor<Concludable> {
     public Either<Request, Response> receiveAnswer(final Request fromUpstream, final Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> ruleSender = fromDownstream.sourceRequest().receiver();
+
         List<Long> rulePattern = ruleActorSources.get(ruleSender);
-        Response.Answer.Inference inference = new Response.Answer.Inference(fromDownstream, rulePattern.toString(), null);
-        Map<String, Set<Response.Answer.Inference>> inferences = map(pair(traversalPattern.toString(), set(inference)));
+        Explanation.Inference inference = new Explanation.Inference(fromDownstream, rulePattern.toString(), null);
+        Map<String, Set<Explanation.Inference>> inferences = map(pair(traversalPattern.toString(), set(inference)));
 
         // TODO may combine with partial answers from the fromUpstream message
         LOG.debug("{}: hasProduced: {}", name, fromDownstream.partialAnswer());
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
-            Response.Answer.Explanation explanation = new Response.Answer.Explanation(inferences);
+            Explanation explanation = new Explanation(inferences);
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
                     fromUpstream.constraints(), fromUpstream.unifiers(), explanation));
         } else {
@@ -103,8 +105,7 @@ public class Concludable extends ExecutionActor<Concludable> {
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                Response.Answer.Explanation explanation = new Response.Answer.Explanation(map());
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), explanation));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(), fromUpstream.unifiers(), null));
             }
         }
 
@@ -118,7 +119,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private void registerDownstreamRules(final ResponseProducer responseProducer, final Request.Path path, final List<Long> partialAnswers,
                                          final List<Object> constraints, final List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
-            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers);
+            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers, new Explanation(map()));
             responseProducer.addDownstreamProducer(toDownstream);
         }
     }

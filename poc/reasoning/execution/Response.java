@@ -1,7 +1,5 @@
 package grakn.common.poc.reasoning.execution;
 
-import grakn.common.poc.reasoning.Explanation;
-
 import javax.annotation.Nullable;
 import java.util.List;
 
@@ -54,6 +52,10 @@ public interface Response {
 
         public List<Object> unifiers() {
             return unifiers;
+        }
+
+        public Explanation explanation() {
+            return explanation;
         }
 
         @Override
