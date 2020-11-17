@@ -59,8 +59,7 @@ public class Concludable extends ExecutionActor<Concludable> {
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
             // update partial explanation provided from upstream to carry explanations sideways
-            Explanation partialExplanation = fromUpstream.partialExplanation().copy();
-            partialExplanation.addInference(traversalPattern.toString(), set(inference));
+            Explanation partialExplanation = fromUpstream.partialExplanation().withInference(traversalPattern.toString(), set(inference));
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
                     fromUpstream.constraints(), fromUpstream.unifiers(), traversalPattern.toString(), partialExplanation));
         } else {

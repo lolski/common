@@ -58,9 +58,9 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
 
-                // take the explanation from the fromDownstream and copy it
+                // take the explanation from the fromDownstream
                 // insert it as the explanation for this response - conjunctions do not create their own explanations
-                Explanation explanation = fromDownstream.explanation().copy();
+                Explanation explanation = fromDownstream.explanation();
 
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
                         fromUpstream.unifiers(), conjunction.toString(), explanation));

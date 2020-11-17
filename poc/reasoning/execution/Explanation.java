@@ -12,23 +12,18 @@ Carry explanations across actors
 NOTE: always shallow copy on sending an answer, as requests messages are shared
  */
 public class Explanation {
-
     public static final Explanation EMPTY = new Explanation(map());
 
     private final Map<String, Set<Inference>> inferences;
 
     public Explanation(Map<String, Set<Inference>> inferences) {
-        this.inferences = inferences;
+        this.inferences = map(inferences);
     }
 
-    public Explanation copy() {
+    public Explanation withInference(String pattern, Set<Inference> inference) {
         Map<String, Set<Inference>> copiedInferences = new HashMap<>(inferences);
+        copiedInferences.put(pattern, inference);
         return new Explanation(copiedInferences);
-    }
-
-    public void addInference(String pattern, Set<Inference> inference) {
-        assert !inferences.containsKey(pattern) : "cannot overwrite prexisting pattern inferences with new ones";
-        inferences.put(pattern, inference);
     }
 
     @Override
