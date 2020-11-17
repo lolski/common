@@ -18,7 +18,7 @@
 
 java_library(
     name = "reasoning",
-    srcs = glob(["*.java", "execution/*.java", "mock/*.java"]),
+    srcs = glob(["*.java", "mock/*.java"]),
     deps = [
         "//:common",
         "@maven//:com_google_code_findbugs_jsr305",

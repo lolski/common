@@ -1,8 +1,7 @@
-package grakn.common.poc.reasoning.execution;
+package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.Registry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

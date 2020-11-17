@@ -2,11 +2,6 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.execution.ExecutionActor;
-import grakn.common.poc.reasoning.execution.Explanation;
-import grakn.common.poc.reasoning.execution.Request;
-import grakn.common.poc.reasoning.execution.Response;
-import grakn.common.poc.reasoning.execution.ResponseProducer;
 import grakn.common.poc.reasoning.mock.MockTransaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

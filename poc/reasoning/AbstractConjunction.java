@@ -2,11 +2,6 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.execution.ExecutionActor;
-import grakn.common.poc.reasoning.execution.Explanation;
-import grakn.common.poc.reasoning.execution.Request;
-import grakn.common.poc.reasoning.execution.Response;
-import grakn.common.poc.reasoning.execution.ResponseProducer;
 import grakn.common.poc.reasoning.mock.MockTransaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,14 +10,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.concat;
 import static grakn.common.collection.Collections.copy;
 import static grakn.common.collection.Collections.map;
-import static grakn.common.collection.Collections.pair;
 import static grakn.common.collection.Collections.set;
 
 public class AbstractConjunction<T extends AbstractConjunction<T>> extends ExecutionActor<T> {

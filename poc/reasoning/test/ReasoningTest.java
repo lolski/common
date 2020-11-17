@@ -6,12 +6,11 @@ import grakn.common.poc.reasoning.Concludable;
 import grakn.common.poc.reasoning.Conjunction;
 import grakn.common.poc.reasoning.Registry;
 import grakn.common.poc.reasoning.Rule;
-import grakn.common.poc.reasoning.execution.Request;
-import grakn.common.poc.reasoning.execution.Response;
+import grakn.common.poc.reasoning.Request;
+import grakn.common.poc.reasoning.Response;
 import org.junit.Test;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
