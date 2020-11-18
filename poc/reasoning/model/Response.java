@@ -22,18 +22,18 @@ public interface Response {
         private final List<Object> unifiers;
 
         private String patternAnswered;
-        private final Explanation explanation;
+        private final Derivations derivations;
 
         public Answer(Request sourceRequest,
                       List<Long> partialAnswer,
                       List<Object> unifiers,
                       String patternAnswered,
-                      Explanation explanation) {
+                      Derivations derivations) {
             this.sourceRequest = sourceRequest;
             this.partialAnswer = partialAnswer;
             this.unifiers = unifiers;
             this.patternAnswered = patternAnswered;
-            this.explanation = explanation;
+            this.derivations = derivations;
         }
 
         @Override
@@ -49,8 +49,12 @@ public interface Response {
             return unifiers;
         }
 
-        public Explanation explanation() {
-            return explanation;
+        public Derivations derivations() {
+            return derivations;
+        }
+
+        public boolean isInferred() {
+            return !derivations.equals(Derivations.EMPTY);
         }
 
         @Override
@@ -71,7 +75,7 @@ public interface Response {
                     ",\n partialAnswer=" + partialAnswer +
                     ",\n unifiers=" + unifiers +
                     ",\n patternAnswered=" + patternAnswered +
-                    ",\n explanation=" + explanation +
+                    ",\n derivations=" + derivations +
                     '}';
         }
     }

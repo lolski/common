@@ -4,7 +4,7 @@ import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.mock.MockTransaction;
 import grakn.common.poc.reasoning.model.ExecutionActor;
-import grakn.common.poc.reasoning.model.Explanation;
+import grakn.common.poc.reasoning.model.Derivations;
 import grakn.common.poc.reasoning.model.Registry;
 import grakn.common.poc.reasoning.model.Request;
 import grakn.common.poc.reasoning.model.Response;
@@ -30,6 +30,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private final Long traversalOffset;
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedAtomics;
+    private Actor<DerivationRecorder> explanationRecorder;
 
     public AbstractConjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
                                Long traversalOffset, LinkedBlockingQueue<Response> responses) {
@@ -49,26 +50,32 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     @Override
     public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
-        List<Long> answer = concat(conjunction, fromDownstream.partialAnswer());
+        List<Long> conceptMap = concat(conjunction, fromDownstream.partialAnswer());
+
+        Derivations derivations = fromDownstream.sourceRequest().partialExplanation();
+        if (fromDownstream.isInferred()) {
+            derivations = derivations.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
+        }
+
         if (isLast(sender)) {
-            LOG.debug("{}: hasProduced: {}", name, answer);
+            LOG.debug("{}: hasProduced: {}", name, conceptMap);
 
-            if (!responseProducer.hasProduced(answer)) {
-                responseProducer.recordProduced(answer);
+            if (!responseProducer.hasProduced(conceptMap)) {
+                responseProducer.recordProduced(conceptMap);
 
-                // take the explanation from the fromDownstream
-                // insert it as the explanation for this response - conjunctions do not create their own explanations
-                Explanation explanation = fromDownstream.explanation();
-
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers(),
-                        conjunction.toString(), explanation));
+                Response.Answer answer = new Response.Answer(fromUpstream, conceptMap, fromUpstream.unifiers(),
+                        conjunction.toString(), derivations);
+                if (fromUpstream.sender() == null) {
+                    explanationRecorder.tell(actor -> actor.recordTree(self(), conceptMap, answer));
+                }
+                return Either.second(answer);
             } else {
                 return produceMessage(fromUpstream, responseProducer);
             }
         } else {
             Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    answer, fromDownstream.unifiers(), fromDownstream.explanation());
+                    conceptMap, fromDownstream.unifiers(), derivations);
             responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -86,7 +93,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
-                request.unifiers(), new Explanation(map()));
+                request.unifiers(), new Derivations(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
@@ -94,6 +101,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
+        explanationRecorder = registry.explanationRecorder();
         List<Long> planned = copy(conjunction);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
@@ -110,7 +118,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
                 return Either.second(new Response.Answer(fromUpstream, answer,
-                        fromUpstream.unifiers(), conjunction.toString(), Explanation.EMPTY));
+                        fromUpstream.unifiers(), conjunction.toString(), Derivations.EMPTY));
             }
         }
 

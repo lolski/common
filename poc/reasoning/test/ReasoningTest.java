@@ -4,8 +4,8 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import grakn.common.poc.reasoning.Concludable;
 import grakn.common.poc.reasoning.Conjunction;
-import grakn.common.poc.reasoning.model.Registry;
 import grakn.common.poc.reasoning.Rule;
+import grakn.common.poc.reasoning.model.Registry;
 import grakn.common.poc.reasoning.model.Request;
 import grakn.common.poc.reasoning.model.Response;
 import org.junit.Test;
@@ -15,16 +15,14 @@ import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.list;
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertTrue;
 
 public class ReasoningTest {
     @Test
     public void singleAtomicActor() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomicPattern = 0L;
         long atomicTraversalSize = 5L;
@@ -39,9 +37,9 @@ public class ReasoningTest {
 
     @Test
     public void doubleAtomicActors() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 2L;
@@ -60,9 +58,9 @@ public class ReasoningTest {
 
     @Test
     public void filteringAtomicActor() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 2L;
@@ -81,9 +79,9 @@ public class ReasoningTest {
 
     @Test
     public void simpleRule() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
@@ -109,9 +107,9 @@ public class ReasoningTest {
 
     @Test
     public void atomicChainWithRule() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
@@ -141,9 +139,9 @@ public class ReasoningTest {
 
     @Test
     public void shallowRerequest() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 2L;
@@ -168,9 +166,9 @@ public class ReasoningTest {
 
     @Test
     public void deepRerequest() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 10L;
@@ -203,9 +201,9 @@ public class ReasoningTest {
 
     @Test
     public void bulkActorCreation() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long start = System.currentTimeMillis();
 
@@ -238,9 +236,9 @@ public class ReasoningTest {
 
     @Test
     public void loopTermination() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomicPattern = 1L;
 
@@ -263,9 +261,9 @@ public class ReasoningTest {
 
     @Test
     public void deduplication() throws InterruptedException {
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long traversalSize = 100L;
 
@@ -299,9 +297,9 @@ public class ReasoningTest {
 
          */
 
-        Registry registry = new Registry();
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
+        Registry registry = new Registry(elg);
 
         long atomic1Pattern = 10L;
         long atomic1TraversalSize = 1L;
@@ -317,7 +315,7 @@ public class ReasoningTest {
         registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic2Pattern);
-        long conjunctionTraversalSize = 0L;
+        long conjunctionTraversalSize = 1L;
         long conjunctionTraversalOffset = -10L;
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
@@ -331,6 +329,7 @@ public class ReasoningTest {
                     )
             );
             Response answer = responses.take();
+            System.out.println(answer);
         }
     }
 

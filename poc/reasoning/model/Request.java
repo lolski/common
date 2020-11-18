@@ -14,16 +14,16 @@ public class Request {
     private final Path path;
     private final List<Long> partialAnswer;
     private final List<Object> unifiers;
-    private final Explanation partialExplanation;
+    private final Derivations partialDerivations;
 
     public Request(Path path,
                    List<Long> partialAnswer,
                    List<Object> unifiers,
-                   Explanation partialExplanation) {
+                   Derivations partialDerivations) {
         this.path = path;
         this.partialAnswer = partialAnswer;
         this.unifiers = unifiers;
-        this.partialExplanation = partialExplanation;
+        this.partialDerivations = partialDerivations;
     }
 
     public Path path() {
@@ -70,8 +70,8 @@ public class Request {
         return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialAnswer + ")";
     }
 
-    public Explanation partialExplanation() {
-        return partialExplanation;
+    public Derivations partialExplanation() {
+        return partialDerivations;
     }
 
     public static class Path {
