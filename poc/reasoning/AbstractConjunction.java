@@ -132,5 +132,6 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     @Override
     protected void exception(Exception e) {
         LOG.error(e.toString());
+        // TODO, once integrated into the larger flow of executing queries, kill the actors and report and exception to root
     }
 }

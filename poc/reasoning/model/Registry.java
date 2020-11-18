@@ -17,11 +17,11 @@ public class Registry {
         this.ruleActors = new HashMap<>();
     }
 
-    public synchronized Actor<Concludable> registerAtomic(Long pattern, Function<Long, Actor<Concludable>> actorConstructor) {
+    public Actor<Concludable> registerAtomic(Long pattern, Function<Long, Actor<Concludable>> actorConstructor) {
         return atomicActors.computeIfAbsent(pattern, actorConstructor);
     }
 
-    public synchronized Actor<Rule> registerRule(List<Long> pattern, Function<List<Long>, Actor<Rule>> actorConstructor) {
+    public Actor<Rule> registerRule(List<Long> pattern, Function<List<Long>, Actor<Rule>> actorConstructor) {
         return ruleActors.computeIfAbsent(pattern, actorConstructor);
     }
 }
