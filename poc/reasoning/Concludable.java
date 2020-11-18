@@ -59,11 +59,20 @@ public class Concludable extends ExecutionActor<Concludable> {
         LOG.debug("{}: hasProduced: {}", name, fromDownstream.partialAnswer());
         if (!responseProducer.hasProduced(fromDownstream.partialAnswer())) {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
+
             // update partial explanation provided from upstream to carry explanations sideways
             Explanation partialExplanation = fromUpstream.partialExplanation().withInference(traversalPattern.toString(), set(inference));
+
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(), fromUpstream.unifiers(),
                     traversalPattern.toString(), partialExplanation));
         } else {
+
+            ExplanationRecorder.recordDuplicateAnswer(fromDownstream.partialAnswer(), fromDownstream.sourceRequest().receiver(), self(), inference);
+
+
+
+
+
 
             // TODO record explanation that is not being sent upstream in recorder actor
             // TODO this will have something to do with the request message (ie its path) and the `inferences` object

@@ -6,11 +6,12 @@ import java.util.Map;
 import java.util.Set;
 
 import static grakn.common.collection.Collections.map;
+import static grakn.common.collection.Collections.pair;
 
 public class Explanation {
     public static final Explanation EMPTY = new Explanation(map());
 
-    private final Map<String, Set<Inference>> inferences;
+    private Map<String, Set<Inference>> inferences;
 
     public Explanation(Map<String, Set<Inference>> inferences) {
         this.inferences = map(inferences);
@@ -20,6 +21,17 @@ public class Explanation {
         Map<String, Set<Inference>> copiedInferences = new HashMap<>(inferences);
         copiedInferences.put(pattern, inference);
         return new Explanation(copiedInferences);
+    }
+
+    public void update(Map<String, Set<Inference>> newInferences) {
+        Map<String, Set<Inference>> copiedInferences = new HashMap<>(inferences);
+        copiedInferences.putAll(newInferences);
+        inferences = copiedInferences;
+    }
+
+
+    public Map<String, Set<Inference>> inferences() {
+        return this.inferences;
     }
 
     @Override
@@ -39,6 +51,10 @@ public class Explanation {
             this.answer = answer;
             this.ruleWhen = ruleWhen;
             this.ruleName = ruleName;
+        }
+
+        public Response.Answer answer() {
+            return answer;
         }
 
         @Override
