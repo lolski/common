@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.model;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;

@@ -3,6 +3,12 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.mock.MockTransaction;
+import grakn.common.poc.reasoning.model.ExecutionActor;
+import grakn.common.poc.reasoning.model.Explanation;
+import grakn.common.poc.reasoning.model.Registry;
+import grakn.common.poc.reasoning.model.Request;
+import grakn.common.poc.reasoning.model.Response;
+import grakn.common.poc.reasoning.model.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,6 +131,6 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     protected void exception(Exception e) {
-
+        LOG.error(e.toString());
     }
 }

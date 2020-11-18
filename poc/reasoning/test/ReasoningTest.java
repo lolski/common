@@ -4,10 +4,10 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import grakn.common.poc.reasoning.Concludable;
 import grakn.common.poc.reasoning.Conjunction;
-import grakn.common.poc.reasoning.Registry;
+import grakn.common.poc.reasoning.model.Registry;
 import grakn.common.poc.reasoning.Rule;
-import grakn.common.poc.reasoning.Request;
-import grakn.common.poc.reasoning.Response;
+import grakn.common.poc.reasoning.model.Request;
+import grakn.common.poc.reasoning.model.Response;
 import org.junit.Test;
 
 import java.util.ArrayList;

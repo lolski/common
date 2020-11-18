@@ -1,6 +1,8 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.model;
 
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.Concludable;
+import grakn.common.poc.reasoning.Rule;
 
 import java.util.HashMap;
 import java.util.List;
