@@ -30,7 +30,7 @@ public class Actor<STATE extends Actor.State<STATE>> {
     private static String ERROR_STATE_IS_NULL = "Cannot process actor message when the state hasn't been setup. Are you calling the method from state constructor?";
 
     public STATE state;
-    private final EventLoopGroup eventLoopGroup;
+    protected final EventLoopGroup eventLoopGroup;
     private final EventLoop eventLoop;
 
     public static <NEW_STATE extends State<NEW_STATE>>
@@ -47,7 +47,7 @@ public class Actor<STATE extends Actor.State<STATE>> {
 
     public void tell(Consumer<STATE> job) {
         assert state != null : ERROR_STATE_IS_NULL;
-        eventLoop.submit(() -> job.accept(state));
+        eventLoop.submit(() -> job.accept(state), state::exception);
     }
 
     @CheckReturnValue
@@ -62,19 +62,19 @@ public class Actor<STATE extends Actor.State<STATE>> {
     public <ANSWER> CompletableFuture<ANSWER> ask(Function<STATE, ANSWER> job) {
         assert state != null : ERROR_STATE_IS_NULL;
         CompletableFuture<ANSWER> future = new CompletableFuture<>();
-        eventLoop.submit(() -> {
-            try {
-                future.complete(job.apply(state));
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        });
+        eventLoop.submit(
+                () -> future.complete(job.apply(state)),
+                e -> {
+                    state.exception(e);
+                    future.completeExceptionally(e);
+                }
+        );
         return future;
     }
 
     public EventLoop.ScheduledJob schedule(long deadlineMs, Consumer<STATE> job) {
         assert state != null : ERROR_STATE_IS_NULL;
-        return eventLoop.submit(deadlineMs, () -> job.accept(state));
+        return eventLoop.submit(deadlineMs, () -> job.accept(state), state::exception);
     }
 
     public EventLoopGroup eventLoopGroup() {
@@ -82,7 +82,9 @@ public class Actor<STATE extends Actor.State<STATE>> {
     }
 
     public static abstract class State<STATE extends State<STATE>> {
-        private Actor<STATE> self;
+        private final Actor<STATE> self;
+
+        protected abstract void exception(Exception e);
 
         protected State(Actor<STATE> self) {
             this.self = self;

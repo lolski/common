@@ -119,6 +119,11 @@ public class Concludable extends ExecutionActor<Concludable> {
         }
     }
 
+    @Override
+    protected void exception(Exception e) {
+        
+    }
+
     private static class RuleTrigger {
         private final List<Long> partialAnswer;
         private final List<Object> constraints;

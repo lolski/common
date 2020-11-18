@@ -123,4 +123,8 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         return plannedAtomics.get(plannedAtomics.indexOf(actor) + 1);
     }
 
+    @Override
+    protected void exception(Exception e) {
+
+    }
 }
