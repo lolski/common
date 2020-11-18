@@ -106,5 +106,13 @@ public interface Response {
         public Response.Exhausted asExhausted() {
             return this;
         }
+
+
+        @Override
+        public String toString() {
+            return "Exhausted{" +
+                    "sourceRequest=" + sourceRequest +
+                    '}';
+        }
     }
 }
