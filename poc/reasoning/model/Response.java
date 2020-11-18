@@ -19,7 +19,6 @@ public interface Response {
     class Answer implements Response {
         private final Request sourceRequest;
         private final List<Long> partialAnswer;
-        private final List<Object> constraints;
         private final List<Object> unifiers;
 
         private String patternAnswered;
@@ -27,13 +26,11 @@ public interface Response {
 
         public Answer(Request sourceRequest,
                       List<Long> partialAnswer,
-                      List<Object> constraints,
                       List<Object> unifiers,
                       String patternAnswered,
                       Explanation explanation) {
             this.sourceRequest = sourceRequest;
             this.partialAnswer = partialAnswer;
-            this.constraints = constraints;
             this.unifiers = unifiers;
             this.patternAnswered = patternAnswered;
             this.explanation = explanation;
@@ -46,10 +43,6 @@ public interface Response {
 
         public List<Long> partialAnswer() {
             return partialAnswer;
-        }
-
-        public List<Object> constraints() {
-            return constraints;
         }
 
         public List<Object> unifiers() {
@@ -76,7 +69,6 @@ public interface Response {
             return "\nAnswer{" +
                     "\nsourceRequest=" + sourceRequest +
                     ",\n partialAnswer=" + partialAnswer +
-                    ",\n constraints=" + constraints +
                     ",\n unifiers=" + unifiers +
                     ",\n patternAnswered=" + patternAnswered +
                     ",\n explanation=" + explanation +

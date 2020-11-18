@@ -225,7 +225,7 @@ public class ReasoningTest {
 
         conjunction.tell(actor ->
                 actor.executeReceiveRequest(
-                        new Request(new Request.Path(conjunction), list(), list(), list(), null),
+                        new Request(new Request.Path(conjunction), list(), list(), null),
                         registry
                 )
         );
@@ -326,7 +326,7 @@ public class ReasoningTest {
         for (int i = 0; i < answerCount; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list(), null),
+                            new Request(new Request.Path(conjunction), list(), list(), null),
                             registry
                     )
             );
@@ -353,7 +353,7 @@ public class ReasoningTest {
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), list(), null),
+                            new Request(new Request.Path(conjunction), list(), list(), null),
                             registry
                     )
             );
@@ -374,9 +374,8 @@ public class ReasoningTest {
         long n = answerCount + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
-                    actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), list(), null), registry));
+                    actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), null), registry));
             Response answer = responses.take();
-            System.out.println(answer);
             if (i < n - 1) {
                 assertTrue(answer.isAnswer());
             } else {

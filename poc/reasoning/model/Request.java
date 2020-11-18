@@ -13,18 +13,15 @@ import static grakn.common.collection.Collections.list;
 public class Request {
     private final Path path;
     private final List<Long> partialAnswer;
-    private final List<Object> constraints;
     private final List<Object> unifiers;
     private final Explanation partialExplanation;
 
     public Request(Path path,
                    List<Long> partialAnswer,
-                   List<Object> constraints,
                    List<Object> unifiers,
                    Explanation partialExplanation) {
         this.path = path;
         this.partialAnswer = partialAnswer;
-        this.constraints = constraints;
         this.unifiers = unifiers;
         this.partialExplanation = partialExplanation;
     }
@@ -49,10 +46,6 @@ public class Request {
         return partialAnswer;
     }
 
-    public List<Object> constraints() {
-        return constraints;
-    }
-
     public List<Object> unifiers() {
         return unifiers;
     }
@@ -64,13 +57,12 @@ public class Request {
         Request request = (Request) o;
         return Objects.equals(path, request.path) &&
                 Objects.equals(partialAnswer, request.partialAnswer()) &&
-                Objects.equals(constraints, request.constraints()) &&
                 Objects.equals(unifiers, request.unifiers());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(path, partialAnswer, constraints, unifiers);
+        return Objects.hash(path, partialAnswer, unifiers);
     }
 
     @Override

@@ -61,8 +61,8 @@ public class Concludable extends ExecutionActor<Concludable> {
             responseProducer.recordProduced(fromDownstream.partialAnswer());
             // update partial explanation provided from upstream to carry explanations sideways
             Explanation partialExplanation = fromUpstream.partialExplanation().withInference(traversalPattern.toString(), set(inference));
-            return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(),
-                    fromUpstream.constraints(), fromUpstream.unifiers(), traversalPattern.toString(), partialExplanation));
+            return Either.second(new Response.Answer(fromUpstream, fromDownstream.partialAnswer(), fromUpstream.unifiers(),
+                    traversalPattern.toString(), partialExplanation));
         } else {
 
             // TODO record explanation that is not being sent upstream in recorder actor
@@ -83,9 +83,9 @@ public class Concludable extends ExecutionActor<Concludable> {
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalPattern, 1)).query(request.partialAnswer());
         ResponseProducer responseProducer = new ResponseProducer(traversal);
 
-        RuleTrigger trigger = new RuleTrigger(request.partialAnswer(), request.constraints());
+        RuleTrigger trigger = new RuleTrigger(request.partialAnswer());
         if (!triggered.contains(trigger)) {
-            registerDownstreamRules(responseProducer, request.path(), request.partialAnswer(), request.constraints(), request.unifiers());
+            registerDownstreamRules(responseProducer, request.path(), request.partialAnswer(), request.unifiers());
             triggered.add(trigger);
         }
         return responseProducer;
@@ -105,7 +105,7 @@ public class Concludable extends ExecutionActor<Concludable> {
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
+                return Either.second(new Response.Answer(fromUpstream, answer,
                         fromUpstream.unifiers(), traversalPattern.toString(), new Explanation(map())));
             }
         }
@@ -118,9 +118,9 @@ public class Concludable extends ExecutionActor<Concludable> {
     }
 
     private void registerDownstreamRules(ResponseProducer responseProducer, Request.Path path, List<Long> partialAnswers,
-                                         List<Object> constraints, List<Object> unifiers) {
+                                         List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
-            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, constraints, unifiers, Explanation.EMPTY);
+            Request toDownstream = new Request(path.append(ruleActor), partialAnswers, unifiers, Explanation.EMPTY);
             responseProducer.addDownstreamProducer(toDownstream);
         }
     }
@@ -133,11 +133,9 @@ public class Concludable extends ExecutionActor<Concludable> {
 
     private static class RuleTrigger {
         private final List<Long> partialAnswer;
-        private final List<Object> constraints;
 
-        public RuleTrigger(List<Long> partialAnswer, List<Object> constraints) {
+        public RuleTrigger(List<Long> partialAnswer) {
             this.partialAnswer = partialAnswer;
-            this.constraints = constraints;
         }
 
         @Override
@@ -145,13 +143,12 @@ public class Concludable extends ExecutionActor<Concludable> {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             RuleTrigger that = (RuleTrigger) o;
-            return Objects.equals(partialAnswer, that.partialAnswer) &&
-                    Objects.equals(constraints, that.constraints);
+            return Objects.equals(partialAnswer, that.partialAnswer);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(partialAnswer, constraints);
+            return Objects.hash(partialAnswer);
         }
     }
 

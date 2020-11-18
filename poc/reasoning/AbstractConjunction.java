@@ -60,15 +60,15 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
                 // insert it as the explanation for this response - conjunctions do not create their own explanations
                 Explanation explanation = fromDownstream.explanation();
 
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
-                        fromUpstream.unifiers(), conjunction.toString(), explanation));
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers(),
+                        conjunction.toString(), explanation));
             } else {
                 return produceMessage(fromUpstream, responseProducer);
             }
         } else {
             Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    answer, fromDownstream.constraints(), fromDownstream.unifiers(), fromDownstream.explanation());
+                    answer, fromDownstream.unifiers(), fromDownstream.explanation());
             responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -86,7 +86,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
-                request.constraints(), request.unifiers(), new Explanation(map()));
+                request.unifiers(), new Explanation(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
@@ -109,7 +109,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
             LOG.debug("{}: hasProduced: {}", name, answer);
             if (!responseProducer.hasProduced(answer)) {
                 responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.constraints(),
+                return Either.second(new Response.Answer(fromUpstream, answer,
                         fromUpstream.unifiers(), conjunction.toString(), Explanation.EMPTY));
             }
         }
