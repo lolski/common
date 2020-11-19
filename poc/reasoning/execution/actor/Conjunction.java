@@ -2,8 +2,9 @@ package grakn.common.poc.reasoning.execution.actor;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.execution.ExecutionRecorder;
-import grakn.common.poc.reasoning.execution.framework.Derivations;
+import grakn.common.poc.reasoning.execution.AnswerRecorder;
+import grakn.common.poc.reasoning.execution.framework.Answer;
+import grakn.common.poc.reasoning.execution.framework.ExecutionRecord;
 import grakn.common.poc.reasoning.execution.framework.Request;
 import grakn.common.poc.reasoning.execution.framework.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
@@ -31,7 +32,7 @@ public class Conjunction<T extends Conjunction<T>> extends ExecutionActor<T> {
     private final Long traversalOffset;
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedConcludables;
-    private Actor<ExecutionRecorder> executionRecorder;
+    private Actor<AnswerRecorder> executionRecorder;
 
     public Conjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
                        Long traversalOffset, LinkedBlockingQueue<Response> responses) {
@@ -51,11 +52,11 @@ public class Conjunction<T extends Conjunction<T>> extends ExecutionActor<T> {
     @Override
     public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream, ResponseProducer responseProducer) {
         Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
-        List<Long> conceptMap = concat(conjunction, fromDownstream.conceptMap());
+        List<Long> conceptMap = concat(conjunction, fromDownstream.answer().conceptMap());
 
-        Derivations derivations = fromDownstream.sourceRequest().partialResolutions();
-        if (fromDownstream.isInferred()) {
-            derivations = derivations.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
+        ExecutionRecord executionRecord = fromDownstream.sourceRequest().partialResolutions();
+        if (fromDownstream.answer().isInferred()) {
+            executionRecord = executionRecord.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream.answer());
         }
 
         if (isLast(sender)) {
@@ -64,19 +65,19 @@ public class Conjunction<T extends Conjunction<T>> extends ExecutionActor<T> {
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
 
-                Response.Answer answer = new Response.Answer(fromUpstream, conceptMap, fromUpstream.unifiers(),
-                        conjunction.toString(), derivations);
+                Answer answer = new Answer(conceptMap, conjunction.toString(), executionRecord, self());
+                Response.Answer response = new Response.Answer(fromUpstream, answer, fromUpstream.unifiers());
                 if (fromUpstream.sender() == null) {
                     executionRecorder.tell(state -> state.record(answer));
                 }
-                return Either.second(answer);
+                return Either.second(response);
             } else {
                 return produceMessage(fromUpstream, responseProducer);
             }
         } else {
             Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    conceptMap, fromDownstream.unifiers(), derivations);
+                    conceptMap, fromDownstream.unifiers(), executionRecord);
             responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -94,7 +95,7 @@ public class Conjunction<T extends Conjunction<T>> extends ExecutionActor<T> {
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedConcludables.get(0)), request.partialConceptMap(),
-                request.unifiers(), new Derivations(map()));
+                request.unifiers(), new ExecutionRecord(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
@@ -118,8 +119,8 @@ public class Conjunction<T extends Conjunction<T>> extends ExecutionActor<T> {
             LOG.debug("{}: hasProduced: {}", name, conceptMap);
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
-                return Either.second(new Response.Answer(fromUpstream, conceptMap,
-                        fromUpstream.unifiers(), conjunction.toString(), Derivations.EMPTY));
+                Answer answer = new Answer(conceptMap, conjunction.toString(), ExecutionRecord.EMPTY, self());
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers()));
             }
         }
 

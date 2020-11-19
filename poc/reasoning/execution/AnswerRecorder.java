@@ -1,7 +1,8 @@
 package grakn.common.poc.reasoning.execution;
 
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.execution.framework.Derivations;
+import grakn.common.poc.reasoning.execution.framework.Answer;
+import grakn.common.poc.reasoning.execution.framework.ExecutionRecord;
 import grakn.common.poc.reasoning.execution.framework.ExecutionActor;
 import grakn.common.poc.reasoning.execution.framework.Response;
 import org.slf4j.Logger;
@@ -14,12 +15,12 @@ import java.util.Objects;
 
 import static grakn.common.collection.Collections.map;
 
-public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
-    private static final Logger LOG = LoggerFactory.getLogger(ExecutionRecorder.class);
+public class AnswerRecorder extends Actor.State<AnswerRecorder> {
+    private static final Logger LOG = LoggerFactory.getLogger(AnswerRecorder.class);
 
-    Map<AnswerIndex, Response.Answer> answers;
+    Map<AnswerIndex, Answer> answers;
 
-    public ExecutionRecorder(final Actor<ExecutionRecorder> self) {
+    public AnswerRecorder(final Actor<AnswerRecorder> self) {
         super(self);
         answers = new HashMap<>();
     }
@@ -29,7 +30,7 @@ public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
         LOG.error("Actor exception", e);
     }
 
-    public void record(Response.Answer answer) {
+    public void record(Answer answer) {
         merge(answer);
     }
 
@@ -37,24 +38,24 @@ public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
      * Recursively merge derivation tree nodes into the existing derivation nodes that are recorded in the
      * answer index. Always keep the pre-existing derivation node, and merge the new ones into the existing node.
      */
-    private Response.Answer merge(Response.Answer newAnswer) {
+    private Answer merge(Answer newAnswer) {
 
-        Derivations newDerivations = newAnswer.derivations();
-        Map<Actor<? extends ExecutionActor<?>>, Response.Answer> subAnswers = newDerivations.answers();
+        ExecutionRecord newExecutionRecord = newAnswer.executionRecord();
+        Map<Actor<? extends ExecutionActor<?>>, Answer> subAnswers = newExecutionRecord.answers();
 
-        Map<Actor<? extends ExecutionActor<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
+        Map<Actor<? extends ExecutionActor<?>>, Answer> mergedSubAnswers = new HashMap<>();
         for (Actor<? extends ExecutionActor<?>> key : subAnswers.keySet()) {
-            Response.Answer subAnswer = subAnswers.get(key);
-            Response.Answer mergedSubAnswer = merge(subAnswer);
+            Answer subAnswer = subAnswers.get(key);
+            Answer mergedSubAnswer = merge(subAnswer);
             mergedSubAnswers.put(key, mergedSubAnswer);
         }
-        newDerivations.replace(mergedSubAnswers);
+        newExecutionRecord.replace(mergedSubAnswers);
 
-        AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.sourceRequest().receiver(), newAnswer.conceptMap());
+        AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.producer(), newAnswer.conceptMap());
         if (answers.containsKey(newAnswerIndex)) {
-            Response.Answer existingAnswer = answers.get(newAnswerIndex);
-            Derivations existingDerivations = existingAnswer.derivations();
-            existingDerivations.update(newDerivations.answers());
+            Answer existingAnswer = answers.get(newAnswerIndex);
+            ExecutionRecord existingExecutionRecord = existingAnswer.executionRecord();
+            existingExecutionRecord.update(newExecutionRecord.answers());
             return existingAnswer;
         } else {
             answers.put(newAnswerIndex, newAnswer);

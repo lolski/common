@@ -20,22 +20,15 @@ public interface Response {
 
     class Answer implements Response {
         private final Request sourceRequest;
-        private final List<Long> conceptMap;
+        private final grakn.common.poc.reasoning.execution.framework.Answer answer;
         private final List<Object> unifiers;
 
-        private final String patternAnswered;
-        private final Derivations derivations;
-
         public Answer(Request sourceRequest,
-                      List<Long> conceptMap,
-                      List<Object> unifiers,
-                      String patternAnswered,
-                      Derivations derivations) {
+                      grakn.common.poc.reasoning.execution.framework.Answer answer,
+                      List<Object> unifiers) {
             this.sourceRequest = sourceRequest;
-            this.conceptMap = conceptMap;
+            this.answer = answer;
             this.unifiers = unifiers;
-            this.patternAnswered = patternAnswered;
-            this.derivations = derivations;
         }
 
         @Override
@@ -43,20 +36,12 @@ public interface Response {
             return sourceRequest;
         }
 
-        public List<Long> conceptMap() {
-            return conceptMap;
+        public grakn.common.poc.reasoning.execution.framework.Answer answer() {
+            return answer;
         }
 
         public List<Object> unifiers() {
             return unifiers;
-        }
-
-        public Derivations derivations() {
-            return derivations;
-        }
-
-        public boolean isInferred() {
-            return !derivations.equals(Derivations.EMPTY);
         }
 
         @Override
@@ -74,13 +59,10 @@ public interface Response {
         public String toString() {
             return "\nAnswer{" +
                     "\nsourceRequest=" + sourceRequest +
-                    ",\n partialConceptMap=" + conceptMap +
-                    ",\n unifiers=" + unifiers +
-                    ",\n patternAnswered=" + patternAnswered +
-                    ",\n derivations=" + derivations +
-                    '}';
+                    ",\nanswer=" + answer +
+                    ",\nunifiers=" + unifiers +
+                    "\n}\n";
         }
-
     }
 
     class Exhausted implements Response {

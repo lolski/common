@@ -13,16 +13,16 @@ public class Request {
     private final Path path;
     private final List<Long> partialConceptMap;
     private final List<Object> unifiers;
-    private final Derivations partialDerivations;
+    private final ExecutionRecord partialExecutionRecord;
 
     public Request(Path path,
                    List<Long> partialConceptMap,
                    List<Object> unifiers,
-                   Derivations partialDerivations) {
+                   ExecutionRecord partialExecutionRecord) {
         this.path = path;
         this.partialConceptMap = partialConceptMap;
         this.unifiers = unifiers;
-        this.partialDerivations = partialDerivations;
+        this.partialExecutionRecord = partialExecutionRecord;
     }
 
     public Path path() {
@@ -69,8 +69,8 @@ public class Request {
         return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialConceptMap + ")";
     }
 
-    public Derivations partialResolutions() {
-        return partialDerivations;
+    public ExecutionRecord partialResolutions() {
+        return partialExecutionRecord;
     }
 
     public static class Path {

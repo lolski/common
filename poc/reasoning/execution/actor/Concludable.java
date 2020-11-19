@@ -2,8 +2,9 @@ package grakn.common.poc.reasoning.execution.actor;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.execution.ExecutionRecorder;
-import grakn.common.poc.reasoning.execution.framework.Derivations;
+import grakn.common.poc.reasoning.execution.AnswerRecorder;
+import grakn.common.poc.reasoning.execution.framework.Answer;
+import grakn.common.poc.reasoning.execution.framework.ExecutionRecord;
 import grakn.common.poc.reasoning.execution.framework.Request;
 import grakn.common.poc.reasoning.execution.framework.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
@@ -32,7 +33,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private final List<List<Long>> rules;
     private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
-    private Actor<ExecutionRecorder> executionRecorder;
+    private Actor<AnswerRecorder> executionRecorder;
 
     public Concludable(Actor<Concludable> self, Long traversalPattern, List<List<Long>> rules, long traversalSize) {
         super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
@@ -57,19 +58,18 @@ public class Concludable extends ExecutionActor<Concludable> {
 
         // TODO may combine with partial concept maps from the fromUpstream message
 
-        LOG.debug("{}: hasProduced: {}", name, fromDownstream.conceptMap());
-        if (!responseProducer.hasProduced(fromDownstream.conceptMap())) {
-            responseProducer.recordProduced(fromDownstream.conceptMap());
+        LOG.debug("{}: hasProduced: {}", name, fromDownstream.answer().conceptMap());
+        if (!responseProducer.hasProduced(fromDownstream.answer().conceptMap())) {
+            responseProducer.recordProduced(fromDownstream.answer().conceptMap());
 
             // update partial derivation provided from upstream to carry derivations sideways
-            Derivations derivations = new Derivations(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
+            ExecutionRecord executionRecord = new ExecutionRecord(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream.answer())));
+            Answer answer = new Answer(fromDownstream.answer().conceptMap(), traversalPattern.toString(), executionRecord, self());
 
-            return Either.second(new Response.Answer(fromUpstream, fromDownstream.conceptMap(), fromUpstream.unifiers(),
-                    traversalPattern.toString(), derivations));
+            return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers()));
         } else {
-            Derivations derivations = new Derivations(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
-            Response.Answer deduplicated = new Response.Answer(fromUpstream, fromDownstream.conceptMap(), fromUpstream.unifiers(),
-                    traversalPattern.toString(), derivations);
+            ExecutionRecord executionRecord = new ExecutionRecord(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream.answer())));
+            Answer deduplicated = new Answer(fromDownstream.answer().conceptMap(), traversalPattern.toString(), executionRecord, self());
             executionRecorder.tell(actor -> actor.record(deduplicated));
 
             return produceMessage(fromUpstream, responseProducer);
@@ -110,8 +110,8 @@ public class Concludable extends ExecutionActor<Concludable> {
             LOG.debug("{}: hasProduced: {}", name, conceptMap);
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
-                return Either.second(new Response.Answer(fromUpstream, conceptMap,
-                        fromUpstream.unifiers(), traversalPattern.toString(), new Derivations(map())));
+                Answer answer = new Answer(conceptMap, traversalPattern.toString(), new ExecutionRecord(map()), self());
+                return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers()));
             }
         }
 
@@ -125,7 +125,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private void registerDownstreamRules(ResponseProducer responseProducer, Request.Path path, List<Long> partialConceptMap,
                                          List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
-            Request toDownstream = new Request(path.append(ruleActor), partialConceptMap, unifiers, Derivations.EMPTY);
+            Request toDownstream = new Request(path.append(ruleActor), partialConceptMap, unifiers, ExecutionRecord.EMPTY);
             responseProducer.addDownstreamProducer(toDownstream);
         }
     }
