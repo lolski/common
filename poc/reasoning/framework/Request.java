@@ -12,16 +12,16 @@ import static grakn.common.collection.Collections.list;
 
 public class Request {
     private final Path path;
-    private final List<Long> partialAnswer;
+    private final List<Long> partialConceptMap;
     private final List<Object> unifiers;
     private final Derivations partialDerivations;
 
     public Request(Path path,
-                   List<Long> partialAnswer,
+                   List<Long> partialConceptMap,
                    List<Object> unifiers,
                    Derivations partialDerivations) {
         this.path = path;
-        this.partialAnswer = partialAnswer;
+        this.partialConceptMap = partialConceptMap;
         this.unifiers = unifiers;
         this.partialDerivations = partialDerivations;
     }
@@ -31,19 +31,19 @@ public class Request {
     }
 
     @Nullable
-    public Actor<? extends ExecutionActor<?>> sender() {
+    public Actor<? extends Execution<?>> sender() {
         if (path.path.size() < 2) {
             return null;
         }
         return path.path.get(path.path.size() - 2);
     }
 
-    public Actor<? extends ExecutionActor<?>> receiver() {
+    public Actor<? extends Execution<?>> receiver() {
         return path.path.get(path.path.size() - 1);
     }
 
-    public List<Long> partialAnswer() {
-        return partialAnswer;
+    public List<Long> partialConceptMap() {
+        return partialConceptMap;
     }
 
     public List<Object> unifiers() {
@@ -56,38 +56,38 @@ public class Request {
         if (o == null || getClass() != o.getClass()) return false;
         Request request = (Request) o;
         return Objects.equals(path, request.path) &&
-                Objects.equals(partialAnswer, request.partialAnswer()) &&
+                Objects.equals(partialConceptMap, request.partialConceptMap()) &&
                 Objects.equals(unifiers, request.unifiers());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(path, partialAnswer, unifiers);
+        return Objects.hash(path, partialConceptMap, unifiers);
     }
 
     @Override
     public String toString() {
-        return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialAnswer + ")";
+        return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialConceptMap + ")";
     }
 
-    public Derivations partialExplanation() {
+    public Derivations partialDerivations() {
         return partialDerivations;
     }
 
     public static class Path {
-        final List<Actor<? extends ExecutionActor<?>>> path;
+        final List<Actor<? extends Execution<?>>> path;
 
-        public Path(Actor<? extends ExecutionActor<?>> sender) {
+        public Path(Actor<? extends Execution<?>> sender) {
             this(list(sender));
         }
 
-        private Path(List<Actor<? extends ExecutionActor<?>>> path) {
+        private Path(List<Actor<? extends Execution<?>>> path) {
             assert !path.isEmpty() : "Path cannot be empty";
             this.path = path;
         }
 
-        public Path append(Actor<? extends ExecutionActor<?>> actor) {
-            List<Actor<? extends ExecutionActor<?>>> appended = new ArrayList<>(path);
+        public Path append(Actor<? extends Execution<?>> actor) {
+            List<Actor<? extends Execution<?>>> appended = new ArrayList<>(path);
             appended.add(actor);
             return new Path(appended);
         }

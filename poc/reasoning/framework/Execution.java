@@ -10,8 +10,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T> {
-    private static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
+public abstract class Execution<T extends Execution<T>> extends Actor.State<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(Execution.class);
 
     protected String name;
     private boolean isInitialised;
@@ -20,11 +20,11 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
-    public ExecutionActor(Actor<T> self, String name) {
+    public Execution(Actor<T> self, String name) {
         this(self, name, null);
     }
 
-    public ExecutionActor(Actor<T> self, String name, @Nullable LinkedBlockingQueue<Response> responses) {
+    public Execution(Actor<T> self, String name, @Nullable LinkedBlockingQueue<Response> responses) {
         super(self);
         this.name = name;
         isInitialised = false;
@@ -100,13 +100,13 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         LOG.debug("{} : Sending a new Request in order to request for an answer from downstream: {}", name, request);
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
-        Actor<? extends ExecutionActor<?>> receiver = request.receiver();
+        Actor<? extends Execution<?>> receiver = request.receiver();
         receiver.tell(actor -> actor.executeReceiveRequest(request, registry));
     }
 
     private void respondToUpstream(Response response, Registry registry) {
         LOG.debug("{}: Sending a new Response to respond with an answer to upstream: {}", name, response);
-        Actor<? extends ExecutionActor<?>> receiver = response.sourceRequest().sender();
+        Actor<? extends Execution<?>> receiver = response.sourceRequest().sender();
         if (receiver == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             LOG.debug("{}: Writing a new Response to output queue", name);

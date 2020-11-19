@@ -18,12 +18,12 @@ public class ResponseProducer {
         downstreamProducerSelector = downstreamProducer.iterator();
     }
 
-    public void recordProduced(List<Long> answer) {
-        produced.add(answer);
+    public void recordProduced(List<Long> conceptMap) {
+        produced.add(conceptMap);
     }
 
-    public boolean hasProduced(List<Long> answer) {
-        return produced.contains(answer);
+    public boolean hasProduced(List<Long> conceptMap) {
+        return produced.contains(conceptMap);
     }
 
     public boolean hasTraversalProducer() {

@@ -2,8 +2,9 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.framework.ExecutionRecorder;
 import grakn.common.poc.reasoning.mock.MockTransaction;
-import grakn.common.poc.reasoning.framework.ExecutionActor;
+import grakn.common.poc.reasoning.framework.Execution;
 import grakn.common.poc.reasoning.framework.Derivations;
 import grakn.common.poc.reasoning.framework.Registry;
 import grakn.common.poc.reasoning.framework.Request;
@@ -23,14 +24,14 @@ import static grakn.common.collection.Collections.copy;
 import static grakn.common.collection.Collections.map;
 import static grakn.common.collection.Collections.set;
 
-public class AbstractConjunction<T extends AbstractConjunction<T>> extends ExecutionActor<T> {
+public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execution<T> {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractConjunction.class);
 
     private final Long traversalSize;
     private final Long traversalOffset;
     private final List<Long> conjunction;
-    private final List<Actor<Concludable>> plannedAtomics;
-    private Actor<ExecutionRecorder> explanationRecorder;
+    private final List<Actor<Concludable>> plannedConcludables;
+    private Actor<ExecutionRecorder> executionRecorder;
 
     public AbstractConjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
                                Long traversalOffset, LinkedBlockingQueue<Response> responses) {
@@ -39,7 +40,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         this.conjunction = conjunction;
         this.traversalSize = traversalSize;
         this.traversalOffset = traversalOffset;
-        this.plannedAtomics = new ArrayList<>();
+        this.plannedConcludables = new ArrayList<>();
     }
 
     @Override
@@ -49,10 +50,10 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream, ResponseProducer responseProducer) {
-        Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
-        List<Long> conceptMap = concat(conjunction, fromDownstream.partialAnswer());
+        Actor<? extends Execution<?>> sender = fromDownstream.sourceRequest().receiver();
+        List<Long> conceptMap = concat(conjunction, fromDownstream.conceptMap());
 
-        Derivations derivations = fromDownstream.sourceRequest().partialExplanation();
+        Derivations derivations = fromDownstream.sourceRequest().partialDerivations();
         if (fromDownstream.isInferred()) {
             derivations = derivations.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
         }
@@ -66,7 +67,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
                 Response.Answer answer = new Response.Answer(fromUpstream, conceptMap, fromUpstream.unifiers(),
                         conjunction.toString(), derivations);
                 if (fromUpstream.sender() == null) {
-                    explanationRecorder.tell(actor -> actor.recordTree(answer));
+                    executionRecorder.tell(state -> state.record(answer));
                 }
                 return Either.second(answer);
             } else {
@@ -92,7 +93,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     protected ResponseProducer createResponseProducer(Request request) {
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
-        Request toDownstream = new Request(request.path().append(plannedAtomics.get(0)), request.partialAnswer(),
+        Request toDownstream = new Request(request.path().append(plannedConcludables.get(0)), request.partialConceptMap(),
                 request.unifiers(), new Derivations(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
@@ -101,23 +102,23 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
-        explanationRecorder = registry.explanationRecorder();
+        executionRecorder = registry.executionRecorder();
         List<Long> planned = copy(conjunction);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
-            Actor<Concludable> atomicActor = registry.registerAtomic(atomicPattern, (pattern) ->
+            Actor<Concludable> atomicActor = registry.registerConcludable(atomicPattern, (pattern) ->
                     Actor.create(self().eventLoopGroup(), (newActor) -> new Concludable(newActor, pattern, Arrays.asList(), 5L)));
-            plannedAtomics.add(atomicActor);
+            plannedConcludables.add(atomicActor);
         }
     }
 
     private Either<Request, Response> produceMessage(Request fromUpstream, ResponseProducer responseProducer) {
         while (responseProducer.hasTraversalProducer()) {
-            List<Long> answer = responseProducer.traversalProducer().next();
-            LOG.debug("{}: hasProduced: {}", name, answer);
-            if (!responseProducer.hasProduced(answer)) {
-                responseProducer.recordProduced(answer);
-                return Either.second(new Response.Answer(fromUpstream, answer,
+            List<Long> conceptMap = responseProducer.traversalProducer().next();
+            LOG.debug("{}: hasProduced: {}", name, conceptMap);
+            if (!responseProducer.hasProduced(conceptMap)) {
+                responseProducer.recordProduced(conceptMap);
+                return Either.second(new Response.Answer(fromUpstream, conceptMap,
                         fromUpstream.unifiers(), conjunction.toString(), Derivations.EMPTY));
             }
         }
@@ -129,12 +130,12 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
         }
     }
 
-    private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {
-        return plannedAtomics.get(plannedAtomics.size() - 1).equals(actor);
+    private boolean isLast(Actor<? extends Execution<?>>  actor) {
+        return plannedConcludables.get(plannedConcludables.size() - 1).equals(actor);
     }
 
-    private Actor<Concludable> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
-        return plannedAtomics.get(plannedAtomics.indexOf(actor) + 1);
+    private Actor<Concludable> nextPlannedDownstream(Actor<? extends Execution<?>>  actor) {
+        return plannedConcludables.get(plannedConcludables.indexOf(actor) + 1);
     }
 
     @Override

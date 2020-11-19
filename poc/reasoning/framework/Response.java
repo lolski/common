@@ -18,19 +18,19 @@ public interface Response {
 
     class Answer implements Response {
         private final Request sourceRequest;
-        private final List<Long> partialAnswer;
+        private final List<Long> conceptMap;
         private final List<Object> unifiers;
 
-        private String patternAnswered;
+        private final String patternAnswered;
         private final Derivations derivations;
 
         public Answer(Request sourceRequest,
-                      List<Long> partialAnswer,
+                      List<Long> conceptMap,
                       List<Object> unifiers,
                       String patternAnswered,
                       Derivations derivations) {
             this.sourceRequest = sourceRequest;
-            this.partialAnswer = partialAnswer;
+            this.conceptMap = conceptMap;
             this.unifiers = unifiers;
             this.patternAnswered = patternAnswered;
             this.derivations = derivations;
@@ -41,8 +41,8 @@ public interface Response {
             return sourceRequest;
         }
 
-        public List<Long> partialAnswer() {
-            return partialAnswer;
+        public List<Long> conceptMap() {
+            return conceptMap;
         }
 
         public List<Object> unifiers() {
@@ -72,7 +72,7 @@ public interface Response {
         public String toString() {
             return "\nAnswer{" +
                     "\nsourceRequest=" + sourceRequest +
-                    ",\n partialAnswer=" + partialAnswer +
+                    ",\n partialConceptMap=" + conceptMap +
                     ",\n unifiers=" + unifiers +
                     ",\n patternAnswered=" + patternAnswered +
                     ",\n derivations=" + derivations +

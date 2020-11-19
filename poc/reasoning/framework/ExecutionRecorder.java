@@ -1,9 +1,6 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.framework;
 
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.Derivations;
-import grakn.common.poc.reasoning.framework.ExecutionActor;
-import grakn.common.poc.reasoning.framework.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +24,7 @@ public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
         LOG.error("Actor exception", e);
     }
 
-    public void recordTree(Response.Answer answer) {
+    public void record(Response.Answer answer) {
         merge(answer);
     }
 
@@ -38,17 +35,17 @@ public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
     private Response.Answer merge(Response.Answer newAnswer) {
 
         Derivations newDerivations = newAnswer.derivations();
-        Map<Actor<? extends ExecutionActor<?>>, Response.Answer> subAnswers = newDerivations.answers();
+        Map<Actor<? extends Execution<?>>, Response.Answer> subAnswers = newDerivations.answers();
 
-        Map<Actor<? extends ExecutionActor<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
-        for (Actor<? extends ExecutionActor<?>> key : subAnswers.keySet()) {
+        Map<Actor<? extends Execution<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
+        for (Actor<? extends Execution<?>> key : subAnswers.keySet()) {
             Response.Answer subAnswer = subAnswers.get(key);
             Response.Answer mergedSubAnswer = merge(subAnswer);
             mergedSubAnswers.put(key, mergedSubAnswer);
         }
         newDerivations.replace(mergedSubAnswers);
 
-        AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.sourceRequest().receiver(), newAnswer.partialAnswer());
+        AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.sourceRequest().receiver(), newAnswer.conceptMap());
         if (answerIndex.containsKey(newAnswerIndex)) {
             Response.Answer existingAnswer = answerIndex.get(newAnswerIndex);
             Derivations existingDerivations = existingAnswer.derivations();
@@ -61,10 +58,10 @@ public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
     }
 
     static class AnswerIndex {
-        private final Actor<? extends ExecutionActor<?>> producer;
-        private List<Long> conceptMap;
+        private final Actor<? extends Execution<?>> producer;
+        private final List<Long> conceptMap;
 
-        public AnswerIndex(final Actor<? extends ExecutionActor<?>> producer, final List<Long> conceptMap) {
+        public AnswerIndex(final Actor<? extends Execution<?>> producer, final List<Long> conceptMap) {
             this.producer = producer;
             this.conceptMap = conceptMap;
         }

@@ -1,10 +1,7 @@
 package grakn.common.poc.reasoning.mock;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static grakn.common.collection.Collections.extend;
 
@@ -17,16 +14,16 @@ import static grakn.common.collection.Collections.extend;
 public class MockTransaction {
     private final long computeLength;
     private final Long traversalPattern;
-    private final int answerInterval;
+    private final int conceptMapInterval;
 
-    public MockTransaction(long computeLength, Long traversalPattern, int answerInterval) {
+    public MockTransaction(long computeLength, Long traversalPattern, int conceptMapInterval) {
         this.computeLength = computeLength + traversalPattern;
         this.traversalPattern = traversalPattern;
-        this.answerInterval = answerInterval;
+        this.conceptMapInterval = conceptMapInterval;
 
     }
 
-    public Iterator<List<Long>> query(List<Long> partialAnswer) {
+    public Iterator<List<Long>> query(List<Long> partialConceptMap) {
         return new Iterator<List<Long>>() {
             long count = traversalPattern;
 
@@ -38,10 +35,10 @@ public class MockTransaction {
             @Override
             public List<Long> next() {
                 while (count < computeLength) {
-                    if (count % answerInterval == 0) {
-                        List<Long> answer = extend(partialAnswer, count);
+                    if (count % conceptMapInterval == 0) {
+                        List<Long> conceptMap = extend(partialConceptMap, count);
                         count++;
-                        return answer;
+                        return conceptMap;
                     } else {
                         count++;
                     }

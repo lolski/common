@@ -19,14 +19,14 @@ import static junit.framework.TestCase.assertTrue;
 
 public class ReasoningTest {
     @Test
-    public void singleAtomicActor() throws InterruptedException {
+    public void singleConcludableActor() throws InterruptedException {
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
         long atomicPattern = 0L;
         long atomicTraversalSize = 5L;
-        registerAtomic(atomicPattern, list(), atomicTraversalSize, registry, elg);
+        registerConcludable(atomicPattern, list(), atomicTraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 5L;
@@ -36,18 +36,18 @@ public class ReasoningTest {
     }
 
     @Test
-    public void doubleAtomicActors() throws InterruptedException {
+    public void doubleConcludableActors() throws InterruptedException {
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 2L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         long atomic2Pattern = 20L;
         long atomic2TraversalSize = 2L;
-        registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
@@ -57,18 +57,18 @@ public class ReasoningTest {
     }
 
     @Test
-    public void filteringAtomicActor() throws InterruptedException {
+    public void filteringConcludableActor() throws InterruptedException {
         LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 2L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         long atomic2Pattern = 20L;
         long atomic2TraversalSize = 0L;
-        registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
@@ -85,7 +85,7 @@ public class ReasoningTest {
 
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         List<Long> rulePattern = list(-2L);
         long ruleTraversalSize = 0L;
@@ -94,7 +94,7 @@ public class ReasoningTest {
 
         long atomic2Pattern = 2L;
         long atomic2TraversalSize = 1L;
-        registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic2Pattern);
         long conjunctionTraversalSize = 0L;
@@ -113,7 +113,7 @@ public class ReasoningTest {
 
         long atomic1Pattern = -2L;
         long atomic1TraversalSize = 1L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         List<Long> rulePattern = list(atomic1Pattern);
         long ruleTraversalSize = 1L;
@@ -122,11 +122,11 @@ public class ReasoningTest {
 
         long atomic2Pattern = 2L;
         long atomic2TraversalSize = 1L;
-        registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
 
         long atomic3Pattern = 20L;
         long atomic3TraversalSize = 1L;
-        registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
+        registerConcludable(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern);
         long conjunctionTraversalSize = 0L;
@@ -145,15 +145,15 @@ public class ReasoningTest {
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 2L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         long atomic2Pattern = 20L;
         long atomic2TraversalSize = 2L;
-        registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
         long atomic3Pattern = 200L;
         long atomic3TraversalSize = 2L;
-        registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
+        registerConcludable(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
@@ -172,23 +172,23 @@ public class ReasoningTest {
 
         long atomic1Pattern = 2L;
         long atomic1TraversalSize = 10L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         long atomic2Pattern = 20L;
         long atomic2TraversalSize = 10L;
-        registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
         long atomic3Pattern = 200L;
         long atomic3TraversalSize = 10L;
-        registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
+        registerConcludable(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
         long atomic4Pattern = 2000L;
         long atomic4TraversalSize = 10L;
-        registerAtomic(atomic4Pattern, list(), atomic4TraversalSize, registry, elg);
+        registerConcludable(atomic4Pattern, list(), atomic4TraversalSize, registry, elg);
 
         long atomic5Pattern = 20000L;
         long atomic5TraversalSize = 10L;
-        registerAtomic(atomic5Pattern, list(), atomic5TraversalSize, registry, elg);
+        registerConcludable(atomic5Pattern, list(), atomic5TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic5Pattern, atomic4Pattern, atomic3Pattern, atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
@@ -214,7 +214,7 @@ public class ReasoningTest {
             atomicRulePatterns.add(pattern);
         }
         long atomicTraversalSize = 1L;
-        registerAtomic(atomicPattern, atomicRulePatterns, atomicTraversalSize, registry, elg);
+        registerConcludable(atomicPattern, atomicRulePatterns, atomicTraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 0L;
@@ -248,7 +248,7 @@ public class ReasoningTest {
         registerRule(rulePattern, ruleTraversalSize, ruleTraversalOffset, registry, elg);
 
         long atomic1TraversalSize = 1L;
-        registerAtomic(atomicPattern, list(rulePattern), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomicPattern, list(rulePattern), atomic1TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 0L;
@@ -269,7 +269,7 @@ public class ReasoningTest {
 
         long atomicPattern = 1L;
         long atomicTraversalSize = traversalSize;
-        registerAtomic(atomicPattern, list(), atomicTraversalSize, registry, elg);
+        registerConcludable(atomicPattern, list(), atomicTraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = traversalSize;
@@ -283,7 +283,7 @@ public class ReasoningTest {
 
 
     @Test
-    public void explanationTest() throws InterruptedException {
+    public void executionRecorderTest() throws InterruptedException {
         /*
 
         when {
@@ -303,7 +303,7 @@ public class ReasoningTest {
 
         long atomic1Pattern = 10L;
         long atomic1TraversalSize = 1L;
-        registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
+        registerConcludable(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         List<Long> rulePattern = list(10L);
         long ruleTraversalSize = 0L;
@@ -312,7 +312,7 @@ public class ReasoningTest {
 
         long atomic2Pattern = 2010L;
         long atomic2TraversalSize = 0L;
-        registerAtomic(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
+        registerConcludable(atomic2Pattern, list(rulePattern), atomic2TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic2Pattern);
         long conjunctionTraversalSize = 1L;
@@ -334,8 +334,8 @@ public class ReasoningTest {
     }
 
 
-    private void registerAtomic(long pattern, List<List<Long>> rules, long traversalSize, Registry registry, EventLoopGroup elg) {
-        registry.registerAtomic(pattern, p -> Actor.create(elg, self -> new Concludable(self, p, rules, traversalSize)));
+    private void registerConcludable(long pattern, List<List<Long>> rules, long traversalSize, Registry registry, EventLoopGroup elg) {
+        registry.registerConcludable(pattern, p -> Actor.create(elg, self -> new Concludable(self, p, rules, traversalSize)));
     }
 
     private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<Response> responses, EventLoopGroup elg) {
