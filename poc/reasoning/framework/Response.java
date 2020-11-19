@@ -75,7 +75,7 @@ public interface Response {
                     ",\n partialConceptMap=" + conceptMap +
                     ",\n unifiers=" + unifiers +
                     ",\n patternAnswered=" + patternAnswered +
-                    ",\n resolutions=" + resolutions +
+                    ",\n resolutionsg=" + resolutions +
                     '}';
         }
     }

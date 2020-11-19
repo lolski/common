@@ -9,12 +9,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class ResolutionRecorder extends Actor.State<ResolutionRecorder> {
-    private static final Logger LOG = LoggerFactory.getLogger(ResolutionRecorder.class);
+public class ResolutionTree extends Actor.State<ResolutionTree> {
+    private static final Logger LOG = LoggerFactory.getLogger(ResolutionTree.class);
 
     Map<AnswerIndex, Response.Answer> answerIndex;
 
-    public ResolutionRecorder(final Actor<ResolutionRecorder> self) {
+    public ResolutionTree(final Actor<ResolutionTree> self) {
         super(self);
         answerIndex = new HashMap<>();
     }

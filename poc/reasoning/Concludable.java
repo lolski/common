@@ -2,7 +2,7 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.ResolutionRecorder;
+import grakn.common.poc.reasoning.framework.ResolutionTree;
 import grakn.common.poc.reasoning.mock.MockTransaction;
 import grakn.common.poc.reasoning.framework.Resolutions;
 import grakn.common.poc.reasoning.framework.Resolver;
@@ -32,7 +32,7 @@ public class Concludable extends Resolver<Concludable> {
     private final List<List<Long>> rules;
     private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
-    private Actor<ResolutionRecorder> recorder;
+    private Actor<ResolutionTree> recorder;
 
     public Concludable(Actor<Concludable> self, Long traversalPattern, List<List<Long>> rules, long traversalSize) {
         super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");

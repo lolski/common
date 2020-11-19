@@ -2,10 +2,10 @@
 
 ## Explanation Guarantees and Behaviour
 
-Derivation is the term for a more complete data structure form which Explanation (user-facing) are taken from. Explanations
-are abbreviated Derivation trees.
+Resolution is the term for a more complete data structure form which Explanation (user-facing) are taken from. Explanations
+are abbreviated Resolution trees.
 
-Derivations are recorded via an actor, and grow as answers are deduplicated.
+Resolutions are recorded via an actor, and grow as answers are deduplicated.
  
 This means that explanations may be incomplete or change as the user requests them and more answer processing occurs.
 Further answer processing may be initiated by the user as well as our precompute buffer.

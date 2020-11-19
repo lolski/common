@@ -2,7 +2,7 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.ResolutionRecorder;
+import grakn.common.poc.reasoning.framework.ResolutionTree;
 import grakn.common.poc.reasoning.mock.MockTransaction;
 import grakn.common.poc.reasoning.framework.Resolver;
 import grakn.common.poc.reasoning.framework.Resolutions;
@@ -31,7 +31,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
     private final Long traversalOffset;
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedConcludables;
-    private Actor<ResolutionRecorder> executionRecorder;
+    private Actor<ResolutionTree> executionRecorder;
 
     public AbstractConjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
                                Long traversalOffset, LinkedBlockingQueue<Response> responses) {
@@ -53,7 +53,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
         Actor<? extends Resolver<?>> sender = fromDownstream.sourceRequest().receiver();
         List<Long> conceptMap = concat(conjunction, fromDownstream.conceptMap());
 
-        Resolutions resolutions = fromDownstream.sourceRequest().partialDerivations();
+        Resolutions resolutions = fromDownstream.sourceRequest().partialResolutions();
         if (fromDownstream.isInferred()) {
             resolutions = resolutions.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
         }

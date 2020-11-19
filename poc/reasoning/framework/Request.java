@@ -70,7 +70,7 @@ public class Request {
         return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialConceptMap + ")";
     }
 
-    public Resolutions partialDerivations() {
+    public Resolutions partialResolutions() {
         return partialResolutions;
     }
 
