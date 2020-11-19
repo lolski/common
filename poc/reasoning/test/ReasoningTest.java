@@ -6,8 +6,7 @@ import grakn.common.poc.reasoning.Concludable;
 import grakn.common.poc.reasoning.Conjunction;
 import grakn.common.poc.reasoning.Rule;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.Request;
-import grakn.common.poc.reasoning.framework.Response;
+import grakn.common.poc.reasoning.framework.Resolver;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -19,8 +18,8 @@ import static junit.framework.TestCase.assertTrue;
 
 public class ReasoningTest {
     @Test
-    public void singleConcludableActor() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+    public void singleConcludable() throws InterruptedException {
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -36,8 +35,8 @@ public class ReasoningTest {
     }
 
     @Test
-    public void doubleConcludableActors() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+    public void doubleConcludables() throws InterruptedException {
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -57,8 +56,8 @@ public class ReasoningTest {
     }
 
     @Test
-    public void filteringConcludableActor() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+    public void filteringConcludable() throws InterruptedException {
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -79,7 +78,7 @@ public class ReasoningTest {
 
     @Test
     public void simpleRule() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -107,7 +106,7 @@ public class ReasoningTest {
 
     @Test
     public void atomicChainWithRule() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -139,7 +138,7 @@ public class ReasoningTest {
 
     @Test
     public void shallowRerequest() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -166,7 +165,7 @@ public class ReasoningTest {
 
     @Test
     public void deepRerequest() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -200,8 +199,8 @@ public class ReasoningTest {
     }
 
     @Test
-    public void bulkActorCreation() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+    public void bulkResolverCreation() throws InterruptedException {
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -223,7 +222,7 @@ public class ReasoningTest {
 
         conjunction.tell(actor ->
                 actor.executeReceiveRequest(
-                        new Request(new Request.Path(conjunction), list(), list(), null),
+                        new Resolver.Request(new Resolver.Request.Path(conjunction), list(), list(), null),
                         registry
                 )
         );
@@ -236,7 +235,7 @@ public class ReasoningTest {
 
     @Test
     public void loopTermination() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -261,7 +260,7 @@ public class ReasoningTest {
 
     @Test
     public void deduplication() throws InterruptedException {
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -280,10 +279,8 @@ public class ReasoningTest {
         assertResponses(conjunction, answerCount, responses, registry);
     }
 
-
-
     @Test
-    public void executionRecorderTest() throws InterruptedException {
+    public void resolutionTreeTest() throws InterruptedException {
         /*
 
         when {
@@ -297,7 +294,7 @@ public class ReasoningTest {
 
          */
 
-        LinkedBlockingQueue<Response> responses = new LinkedBlockingQueue<>();
+        LinkedBlockingQueue<Resolver.Response> responses = new LinkedBlockingQueue<>();
         EventLoopGroup elg = new EventLoopGroup(1, "reasoning-elg");
         Registry registry = new Registry(elg);
 
@@ -324,11 +321,11 @@ public class ReasoningTest {
         for (int i = 0; i < answerCount; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), null),
+                            new Resolver.Request(new Resolver.Request.Path(conjunction), list(), list(), null),
                             registry
                     )
             );
-            Response answer = responses.take();
+            Resolver.Response answer = responses.take();
             System.out.println(answer);
         }
     }
@@ -338,7 +335,7 @@ public class ReasoningTest {
         registry.registerConcludable(pattern, p -> Actor.create(elg, self -> new Concludable(self, p, rules, traversalSize)));
     }
 
-    private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<Response> responses, EventLoopGroup elg) {
+    private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<Resolver.Response> responses, EventLoopGroup elg) {
         return Actor.create(elg, self -> new Conjunction(self, pattern, traversalSize, traversalOffset, responses));
     }
 
@@ -346,20 +343,20 @@ public class ReasoningTest {
         registry.registerRule(pattern, p -> Actor.create(elg, self -> new Rule(self, p, traversalSize, traversalOffset)));
     }
 
-    private void assertResponses(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
+    private void assertResponses(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Resolver.Response> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number of traversal answers, plus one expected Exhausted (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
                     actor.executeReceiveRequest(
-                            new Request(new Request.Path(conjunction), list(), list(), null),
+                            new Resolver.Request(new Resolver.Request.Path(conjunction), list(), list(), null),
                             registry
                     )
             );
         }
 
         for (int i = 0; i < n - 1; i++) {
-            Response answer = responses.take();
+            Resolver.Response answer = responses.take();
             assertTrue(answer.isAnswer());
         }
         assertTrue(responses.take().isExhausted());
@@ -368,13 +365,13 @@ public class ReasoningTest {
         assertTrue(responses.isEmpty());
     }
 
-    private void assertResponsesSync(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
+    private void assertResponsesSync(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Resolver.Response> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
             conjunction.tell(actor ->
-                    actor.executeReceiveRequest(new Request(new Request.Path(conjunction), list(), list(), null), registry));
-            Response answer = responses.take();
+                    actor.executeReceiveRequest(new Resolver.Request(new Resolver.Request.Path(conjunction), list(), list(), null), registry));
+            Resolver.Response answer = responses.take();
             if (i < n - 1) {
                 assertTrue(answer.isAnswer());
             } else {

@@ -1,7 +1,6 @@
 package grakn.common.poc.reasoning;
 
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.Response;
 
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;

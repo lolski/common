@@ -5,10 +5,7 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.framework.ResolutionTree;
 import grakn.common.poc.reasoning.mock.MockTransaction;
 import grakn.common.poc.reasoning.framework.Resolver;
-import grakn.common.poc.reasoning.framework.Resolutions;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.Request;
-import grakn.common.poc.reasoning.framework.Response;
 import grakn.common.poc.reasoning.framework.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,9 +50,9 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
         Actor<? extends Resolver<?>> sender = fromDownstream.sourceRequest().receiver();
         List<Long> conceptMap = concat(conjunction, fromDownstream.conceptMap());
 
-        Resolutions resolutions = fromDownstream.sourceRequest().partialResolutions();
+        Response.Answer.Resolution resolution = fromDownstream.sourceRequest().partialResolutions();
         if (fromDownstream.isInferred()) {
-            resolutions = resolutions.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
+            resolution = resolution.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
         }
 
         if (isLast(sender)) {
@@ -65,9 +62,9 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
                 responseProducer.recordProduced(conceptMap);
 
                 Response.Answer answer = new Response.Answer(fromUpstream, conceptMap, fromUpstream.unifiers(),
-                        conjunction.toString(), resolutions);
+                        conjunction.toString(), resolution);
                 if (fromUpstream.sender() == null) {
-                    executionRecorder.tell(state -> state.record(answer));
+                    executionRecorder.tell(state -> state.grow(answer));
                 }
                 return Either.second(answer);
             } else {
@@ -76,7 +73,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
         } else {
             Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    conceptMap, fromDownstream.unifiers(), resolutions);
+                    conceptMap, fromDownstream.unifiers(), resolution);
             responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -94,7 +91,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedConcludables.get(0)), request.partialConceptMap(),
-                request.unifiers(), new Resolutions(map()));
+                request.unifiers(), new Response.Answer.Resolution(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
@@ -119,7 +116,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Resol
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
                 return Either.second(new Response.Answer(fromUpstream, conceptMap,
-                        fromUpstream.unifiers(), conjunction.toString(), Resolutions.EMPTY));
+                        fromUpstream.unifiers(), conjunction.toString(), Response.Answer.Resolution.EMPTY));
             }
         }
 

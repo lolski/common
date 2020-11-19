@@ -9,14 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static grakn.common.collection.Collections.map;
+
 public class ResolutionTree extends Actor.State<ResolutionTree> {
     private static final Logger LOG = LoggerFactory.getLogger(ResolutionTree.class);
 
-    Map<AnswerIndex, Response.Answer> answerIndex;
+    Map<AnswerIndex, Resolver.Response.Answer> answers;
 
     public ResolutionTree(final Actor<ResolutionTree> self) {
         super(self);
-        answerIndex = new HashMap<>();
+        answers = new HashMap<>();
     }
 
     @Override
@@ -24,7 +26,7 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
         LOG.error("Actor exception", e);
     }
 
-    public void record(Response.Answer answer) {
+    public void grow(Resolver.Response.Answer answer) {
         merge(answer);
     }
 
@@ -32,27 +34,27 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
      * Recursively merge resolution tree nodes into the existing resolution nodes that are recorded in the
      * answer index. Always keep the pre-existing resolution node, and merge the new ones into the existing node.
      */
-    private Response.Answer merge(Response.Answer newAnswer) {
+    private Resolver.Response.Answer merge(Resolver.Response.Answer newAnswer) {
 
-        Resolutions newResolutions = newAnswer.resolutions();
-        Map<Actor<? extends Resolver<?>>, Response.Answer> subAnswers = newResolutions.answers();
+        Resolver.Response.Answer.Resolution newResolution = newAnswer.resolutions();
+        Map<Actor<? extends Resolver<?>>, Resolver.Response.Answer> subAnswers = newResolution.answers();
 
-        Map<Actor<? extends Resolver<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
+        Map<Actor<? extends Resolver<?>>, Resolver.Response.Answer> mergedSubAnswers = new HashMap<>();
         for (Actor<? extends Resolver<?>> key : subAnswers.keySet()) {
-            Response.Answer subAnswer = subAnswers.get(key);
-            Response.Answer mergedSubAnswer = merge(subAnswer);
+            Resolver.Response.Answer subAnswer = subAnswers.get(key);
+            Resolver.Response.Answer mergedSubAnswer = merge(subAnswer);
             mergedSubAnswers.put(key, mergedSubAnswer);
         }
-        newResolutions.replace(mergedSubAnswers);
+        newResolution.replace(mergedSubAnswers);
 
         AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.sourceRequest().receiver(), newAnswer.conceptMap());
-        if (answerIndex.containsKey(newAnswerIndex)) {
-            Response.Answer existingAnswer = answerIndex.get(newAnswerIndex);
-            Resolutions existingResolutions = existingAnswer.resolutions();
-            existingResolutions.update(newResolutions.answers());
+        if (answers.containsKey(newAnswerIndex)) {
+            Resolver.Response.Answer existingAnswer = answers.get(newAnswerIndex);
+            Resolver.Response.Answer.Resolution existingResolution = existingAnswer.resolutions();
+            existingResolution.update(newResolution.answers());
             return existingAnswer;
         } else {
-            answerIndex.put(newAnswerIndex, newAnswer);
+            answers.put(newAnswerIndex, newAnswer);
             return newAnswer;
         }
     }
@@ -88,4 +90,5 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
             return Objects.hash(producer, conceptMap);
         }
     }
+
 }

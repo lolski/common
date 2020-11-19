@@ -8,8 +8,8 @@ import java.util.Set;
 public class ResponseProducer {
     private final Set<List<Long>> produced;
     private final Iterator<List<Long>> traversalProducer;
-    private final Set<Request> downstreamProducer;
-    private Iterator<Request> downstreamProducerSelector;
+    private final Set<Resolver.Request> downstreamProducer;
+    private Iterator<Resolver.Request> downstreamProducerSelector;
 
     public ResponseProducer(Iterator<List<Long>> traversalProducer) {
         produced = new HashSet<>();
@@ -38,19 +38,19 @@ public class ResponseProducer {
         return !downstreamProducer.isEmpty();
     }
 
-    public Request nextDownstreamProducer() {
+    public Resolver.Request nextDownstreamProducer() {
         if (!downstreamProducerSelector.hasNext()) downstreamProducerSelector = downstreamProducer.iterator();
         return downstreamProducerSelector.next();
     }
 
-    public void addDownstreamProducer(Request request) {
+    public void addDownstreamProducer(Resolver.Request request) {
         assert !(downstreamProducer.contains(request)) : "downstream answer producer already contains this request";
 
         downstreamProducer.add(request);
         downstreamProducerSelector = downstreamProducer.iterator();
     }
 
-    public void removeDownstreamProducer(Request request) {
+    public void removeDownstreamProducer(Resolver.Request request) {
         boolean removed = downstreamProducer.remove(request);
         // only update the iterator when removing an element, to avoid resetting and reusing first request too often
         // note: this is a large performance win when processing large batches of requests
