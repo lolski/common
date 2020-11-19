@@ -30,7 +30,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
     private final Long traversalOffset;
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedAtomics;
-    private Actor<DerivationRecorder> explanationRecorder;
+    private Actor<ExecutionRecorder> explanationRecorder;
 
     public AbstractConjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
                                Long traversalOffset, LinkedBlockingQueue<Response> responses) {

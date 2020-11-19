@@ -31,7 +31,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private final List<List<Long>> rules;
     private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
-    private Actor<DerivationRecorder> recorder;
+    private Actor<ExecutionRecorder> recorder;
 
     public Concludable(Actor<Concludable> self, Long traversalPattern, List<List<Long>> rules, long traversalSize) {
         super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");

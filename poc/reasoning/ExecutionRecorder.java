@@ -12,12 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class DerivationRecorder extends Actor.State<DerivationRecorder> {
-    private static final Logger LOG = LoggerFactory.getLogger(DerivationRecorder.class);
+public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
+    private static final Logger LOG = LoggerFactory.getLogger(ExecutionRecorder.class);
 
     Map<AnswerIndex, Response.Answer> answerIndex;
 
-    public DerivationRecorder(final Actor<DerivationRecorder> self) {
+    public ExecutionRecorder(final Actor<ExecutionRecorder> self) {
         super(self);
         answerIndex = new HashMap<>();
     }
