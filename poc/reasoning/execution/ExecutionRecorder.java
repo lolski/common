@@ -1,9 +1,9 @@
-package grakn.common.poc.reasoning.framework;
+package grakn.common.poc.reasoning.execution;
 
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.execution.Derivations;
-import grakn.common.poc.reasoning.framework.execution.ExecutionActor;
-import grakn.common.poc.reasoning.framework.execution.Response;
+import grakn.common.poc.reasoning.execution.framework.Derivations;
+import grakn.common.poc.reasoning.execution.framework.ExecutionActor;
+import grakn.common.poc.reasoning.execution.framework.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

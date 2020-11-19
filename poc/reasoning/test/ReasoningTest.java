@@ -2,12 +2,12 @@ package grakn.common.poc.reasoning.test;
 
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
-import grakn.common.poc.reasoning.Concludable;
-import grakn.common.poc.reasoning.Root;
-import grakn.common.poc.reasoning.Rule;
-import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.execution.Request;
-import grakn.common.poc.reasoning.framework.execution.Response;
+import grakn.common.poc.reasoning.execution.actor.Concludable;
+import grakn.common.poc.reasoning.execution.actor.Root;
+import grakn.common.poc.reasoning.execution.actor.Rule;
+import grakn.common.poc.reasoning.execution.Registry;
+import grakn.common.poc.reasoning.execution.framework.Request;
+import grakn.common.poc.reasoning.execution.framework.Response;
 import org.junit.Test;
 
 import java.util.ArrayList;

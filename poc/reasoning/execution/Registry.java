@@ -1,9 +1,9 @@
-package grakn.common.poc.reasoning.framework;
+package grakn.common.poc.reasoning.execution;
 
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
-import grakn.common.poc.reasoning.Concludable;
-import grakn.common.poc.reasoning.Rule;
+import grakn.common.poc.reasoning.execution.actor.Concludable;
+import grakn.common.poc.reasoning.execution.actor.Rule;
 
 import java.util.HashMap;
 import java.util.List;

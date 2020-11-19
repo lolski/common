@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning.framework.execution;
+package grakn.common.poc.reasoning.execution.framework;
 
 import java.util.List;
 

@@ -1,15 +1,15 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution.actor;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.ExecutionRecorder;
-import grakn.common.poc.reasoning.framework.execution.Derivations;
-import grakn.common.poc.reasoning.framework.execution.Request;
-import grakn.common.poc.reasoning.framework.execution.Response;
+import grakn.common.poc.reasoning.execution.ExecutionRecorder;
+import grakn.common.poc.reasoning.execution.framework.Derivations;
+import grakn.common.poc.reasoning.execution.framework.Request;
+import grakn.common.poc.reasoning.execution.framework.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
-import grakn.common.poc.reasoning.framework.execution.ExecutionActor;
-import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.execution.ResponseProducer;
+import grakn.common.poc.reasoning.execution.framework.ExecutionActor;
+import grakn.common.poc.reasoning.execution.Registry;
+import grakn.common.poc.reasoning.execution.framework.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

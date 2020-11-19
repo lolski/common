@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning;
+package grakn.common.poc.reasoning.execution.actor;
 
 import grakn.common.concurrent.actor.Actor;
 

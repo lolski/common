@@ -19,7 +19,12 @@ exports_files(["README.md"])
 
 java_library(
     name = "reasoning",
-    srcs = glob(["*.java", "mock/*.java", "framework/*.java", "framework/execution/*.java"]),
+    srcs = glob([
+        "execution/*.java",
+        "execution/actor/*.java",
+        "execution/framework/*.java",
+        "mock/*.java",
+    ]),
     deps = [
         "//:common",
         "@maven//:com_google_code_findbugs_jsr305",
