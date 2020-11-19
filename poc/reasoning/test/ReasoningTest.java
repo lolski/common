@@ -6,8 +6,8 @@ import grakn.common.poc.reasoning.Concludable;
 import grakn.common.poc.reasoning.Root;
 import grakn.common.poc.reasoning.Rule;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.resolver.Request;
-import grakn.common.poc.reasoning.framework.resolver.Response;
+import grakn.common.poc.reasoning.framework.execution.Request;
+import grakn.common.poc.reasoning.framework.execution.Response;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -281,7 +281,7 @@ public class ReasoningTest {
     }
 
     @Test
-    public void resolutionTreeTest() throws InterruptedException {
+    public void executionRecorderTest() throws InterruptedException {
         /*
 
         when {

@@ -2,13 +2,14 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.ResolutionTree;
-import grakn.common.poc.reasoning.framework.resolver.Request;
-import grakn.common.poc.reasoning.framework.resolver.Response;
+import grakn.common.poc.reasoning.framework.ExecutionRecorder;
+import grakn.common.poc.reasoning.framework.execution.Derivations;
+import grakn.common.poc.reasoning.framework.execution.Request;
+import grakn.common.poc.reasoning.framework.execution.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
-import grakn.common.poc.reasoning.framework.resolver.Resolver;
+import grakn.common.poc.reasoning.framework.execution.ExecutionActor;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.resolver.ResponseProducer;
+import grakn.common.poc.reasoning.framework.execution.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,14 +24,14 @@ import static grakn.common.collection.Collections.copy;
 import static grakn.common.collection.Collections.map;
 import static grakn.common.collection.Collections.set;
 
-public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
+public class Conjunction<T extends Conjunction<T>> extends ExecutionActor<T> {
     private static final Logger LOG = LoggerFactory.getLogger(Conjunction.class);
 
     private final Long traversalSize;
     private final Long traversalOffset;
     private final List<Long> conjunction;
     private final List<Actor<Concludable>> plannedConcludables;
-    private Actor<ResolutionTree> resolutionTree;
+    private Actor<ExecutionRecorder> executionRecorder;
 
     public Conjunction(Actor<T> self, String name, List<Long> conjunction, Long traversalSize,
                        Long traversalOffset, LinkedBlockingQueue<Response> responses) {
@@ -49,12 +50,12 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
 
     @Override
     public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream, ResponseProducer responseProducer) {
-        Actor<? extends Resolver<?>> sender = fromDownstream.sourceRequest().receiver();
+        Actor<? extends ExecutionActor<?>> sender = fromDownstream.sourceRequest().receiver();
         List<Long> conceptMap = concat(conjunction, fromDownstream.conceptMap());
 
-        Response.Answer.Resolution resolution = fromDownstream.sourceRequest().partialResolutions();
+        Derivations derivations = fromDownstream.sourceRequest().partialResolutions();
         if (fromDownstream.isInferred()) {
-            resolution = resolution.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
+            derivations = derivations.withAnswer(fromDownstream.sourceRequest().receiver(), fromDownstream);
         }
 
         if (isLast(sender)) {
@@ -64,9 +65,9 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
                 responseProducer.recordProduced(conceptMap);
 
                 Response.Answer answer = new Response.Answer(fromUpstream, conceptMap, fromUpstream.unifiers(),
-                        conjunction.toString(), resolution);
+                        conjunction.toString(), derivations);
                 if (fromUpstream.sender() == null) {
-                    resolutionTree.tell(state -> state.grow(answer));
+                    executionRecorder.tell(state -> state.record(answer));
                 }
                 return Either.second(answer);
             } else {
@@ -75,7 +76,7 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
         } else {
             Actor<Concludable> nextPlannedDownstream = nextPlannedDownstream(sender);
             Request downstreamRequest = new Request(fromUpstream.path().append(nextPlannedDownstream),
-                    conceptMap, fromDownstream.unifiers(), resolution);
+                    conceptMap, fromDownstream.unifiers(), derivations);
             responseProducer.addDownstreamProducer(downstreamRequest);
             return Either.first(downstreamRequest);
         }
@@ -93,7 +94,7 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
         Iterator<List<Long>> traversal = (new MockTransaction(traversalSize, traversalOffset, 1)).query(conjunction);
         ResponseProducer responseProducer = new ResponseProducer(traversal);
         Request toDownstream = new Request(request.path().append(plannedConcludables.get(0)), request.partialConceptMap(),
-                request.unifiers(), new Response.Answer.Resolution(map()));
+                request.unifiers(), new Derivations(map()));
         responseProducer.addDownstreamProducer(toDownstream);
 
         return responseProducer;
@@ -101,7 +102,7 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
-        resolutionTree = registry.resolutionTree();
+        executionRecorder = registry.executionRecorder();
         List<Long> planned = copy(conjunction);
         // in the future, we'll check if the atom is rule resolvable first
         for (Long atomicPattern : planned) {
@@ -118,7 +119,7 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
                 return Either.second(new Response.Answer(fromUpstream, conceptMap,
-                        fromUpstream.unifiers(), conjunction.toString(), Response.Answer.Resolution.EMPTY));
+                        fromUpstream.unifiers(), conjunction.toString(), Derivations.EMPTY));
             }
         }
 
@@ -129,11 +130,11 @@ public class Conjunction<T extends Conjunction<T>> extends Resolver<T> {
         }
     }
 
-    private boolean isLast(Actor<? extends Resolver<?>>  actor) {
+    private boolean isLast(Actor<? extends ExecutionActor<?>>  actor) {
         return plannedConcludables.get(plannedConcludables.size() - 1).equals(actor);
     }
 
-    private Actor<Concludable> nextPlannedDownstream(Actor<? extends Resolver<?>>  actor) {
+    private Actor<Concludable> nextPlannedDownstream(Actor<? extends ExecutionActor<?>>  actor) {
         return plannedConcludables.get(plannedConcludables.indexOf(actor) + 1);
     }
 

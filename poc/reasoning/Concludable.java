@@ -2,13 +2,14 @@ package grakn.common.poc.reasoning;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.ResolutionTree;
-import grakn.common.poc.reasoning.framework.resolver.Request;
-import grakn.common.poc.reasoning.framework.resolver.Response;
+import grakn.common.poc.reasoning.framework.ExecutionRecorder;
+import grakn.common.poc.reasoning.framework.execution.Derivations;
+import grakn.common.poc.reasoning.framework.execution.Request;
+import grakn.common.poc.reasoning.framework.execution.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
-import grakn.common.poc.reasoning.framework.resolver.Resolver;
+import grakn.common.poc.reasoning.framework.execution.ExecutionActor;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.resolver.ResponseProducer;
+import grakn.common.poc.reasoning.framework.execution.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +24,7 @@ import java.util.Set;
 import static grakn.common.collection.Collections.map;
 import static grakn.common.collection.Collections.pair;
 
-public class Concludable extends Resolver<Concludable> {
+public class Concludable extends ExecutionActor<Concludable> {
     private static final Logger LOG = LoggerFactory.getLogger(Concludable.class);
 
     private final Long traversalPattern;
@@ -31,7 +32,7 @@ public class Concludable extends Resolver<Concludable> {
     private final List<List<Long>> rules;
     private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
-    private Actor<ResolutionTree> resolutionTree;
+    private Actor<ExecutionRecorder> executionRecorder;
 
     public Concludable(Actor<Concludable> self, Long traversalPattern, List<List<Long>> rules, long traversalSize) {
         super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
@@ -50,7 +51,7 @@ public class Concludable extends Resolver<Concludable> {
     @Override
     public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
-        Actor<? extends Resolver<?>> ruleSender = fromDownstream.sourceRequest().receiver();
+        Actor<? extends ExecutionActor<?>> ruleSender = fromDownstream.sourceRequest().receiver();
 
         List<Long> rulePattern = ruleActorSources.get(ruleSender);
 
@@ -60,16 +61,16 @@ public class Concludable extends Resolver<Concludable> {
         if (!responseProducer.hasProduced(fromDownstream.conceptMap())) {
             responseProducer.recordProduced(fromDownstream.conceptMap());
 
-            // update partial resolution provided from upstream to carry resolutions sideways
-            Response.Answer.Resolution resolution = new Response.Answer.Resolution(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
+            // update partial derivation provided from upstream to carry derivations sideways
+            Derivations derivations = new Derivations(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
 
             return Either.second(new Response.Answer(fromUpstream, fromDownstream.conceptMap(), fromUpstream.unifiers(),
-                    traversalPattern.toString(), resolution));
+                    traversalPattern.toString(), derivations));
         } else {
-            Response.Answer.Resolution resolution = new Response.Answer.Resolution(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
+            Derivations derivations = new Derivations(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
             Response.Answer deduplicated = new Response.Answer(fromUpstream, fromDownstream.conceptMap(), fromUpstream.unifiers(),
-                    traversalPattern.toString(), resolution);
-            resolutionTree.tell(actor -> actor.grow(deduplicated));
+                    traversalPattern.toString(), derivations);
+            executionRecorder.tell(actor -> actor.record(deduplicated));
 
             return produceMessage(fromUpstream, responseProducer);
         }
@@ -96,7 +97,7 @@ public class Concludable extends Resolver<Concludable> {
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
-        resolutionTree = registry.resolutionTree();
+        executionRecorder = registry.executionRecorder();
         for (List<Long> rule : rules) {
             Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> Actor.create(self().eventLoopGroup(), actor -> new Rule(actor, pattern, 1L, 0L)));
             ruleActorSources.put(ruleActor, rule);
@@ -110,7 +111,7 @@ public class Concludable extends Resolver<Concludable> {
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
                 return Either.second(new Response.Answer(fromUpstream, conceptMap,
-                        fromUpstream.unifiers(), traversalPattern.toString(), new Response.Answer.Resolution(map())));
+                        fromUpstream.unifiers(), traversalPattern.toString(), new Derivations(map())));
             }
         }
 
@@ -124,7 +125,7 @@ public class Concludable extends Resolver<Concludable> {
     private void registerDownstreamRules(ResponseProducer responseProducer, Request.Path path, List<Long> partialConceptMap,
                                          List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
-            Request toDownstream = new Request(path.append(ruleActor), partialConceptMap, unifiers, Response.Answer.Resolution.EMPTY);
+            Request toDownstream = new Request(path.append(ruleActor), partialConceptMap, unifiers, Derivations.EMPTY);
             responseProducer.addDownstreamProducer(toDownstream);
         }
     }

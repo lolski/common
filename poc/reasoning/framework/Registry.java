@@ -12,12 +12,12 @@ import java.util.function.Function;
 public class Registry {
     private final HashMap<Long, Actor<Concludable>> concludables;
     private final HashMap<List<Long>, Actor<Rule>> rules;
-    private final Actor<ResolutionTree> resolutionTree;
+    private final Actor<ExecutionRecorder> executionRecorder;
 
     public Registry(EventLoopGroup elg) {
         concludables = new HashMap<>();
         rules = new HashMap<>();
-        resolutionTree = Actor.create(elg, ResolutionTree::new);
+        executionRecorder = Actor.create(elg, ExecutionRecorder::new);
     }
 
     public Actor<Concludable> registerConcludable(Long pattern, Function<Long, Actor<Concludable>> actorConstructor) {
@@ -28,7 +28,7 @@ public class Registry {
         return rules.computeIfAbsent(pattern, actorConstructor);
     }
 
-    public Actor<ResolutionTree> resolutionTree() {
-        return resolutionTree;
+    public Actor<ExecutionRecorder> executionRecorder() {
+        return executionRecorder;
     }
 }

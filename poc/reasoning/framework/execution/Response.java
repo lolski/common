@@ -1,10 +1,6 @@
-package grakn.common.poc.reasoning.framework.resolver;
+package grakn.common.poc.reasoning.framework.execution;
 
-import grakn.common.concurrent.actor.Actor;
-
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static grakn.common.collection.Collections.map;
 
@@ -28,18 +24,18 @@ public interface Response {
         private final List<Object> unifiers;
 
         private final String patternAnswered;
-        private final Answer.Resolution resolution;
+        private final Derivations derivations;
 
         public Answer(Request sourceRequest,
                       List<Long> conceptMap,
                       List<Object> unifiers,
                       String patternAnswered,
-                      Answer.Resolution resolution) {
+                      Derivations derivations) {
             this.sourceRequest = sourceRequest;
             this.conceptMap = conceptMap;
             this.unifiers = unifiers;
             this.patternAnswered = patternAnswered;
-            this.resolution = resolution;
+            this.derivations = derivations;
         }
 
         @Override
@@ -55,12 +51,12 @@ public interface Response {
             return unifiers;
         }
 
-        public Answer.Resolution resolutions() {
-            return resolution;
+        public Derivations derivations() {
+            return derivations;
         }
 
         public boolean isInferred() {
-            return !resolution.equals(Answer.Resolution.EMPTY);
+            return !derivations.equals(Derivations.EMPTY);
         }
 
         @Override
@@ -81,45 +77,10 @@ public interface Response {
                     ",\n partialConceptMap=" + conceptMap +
                     ",\n unifiers=" + unifiers +
                     ",\n patternAnswered=" + patternAnswered +
-                    ",\n resolutionsg=" + resolution +
+                    ",\n derivations=" + derivations +
                     '}';
         }
 
-        public static class Resolution {
-            public static final Answer.Resolution EMPTY = new Answer.Resolution(map());
-
-            private Map<Actor<? extends Resolver<?>>, Answer> answers;
-
-            public Resolution(Map<Actor<? extends Resolver<?>>, Answer> answers) {
-                this.answers = map(answers);
-            }
-
-            public Answer.Resolution withAnswer(Actor<? extends Resolver<?>> producer, Answer answer) {
-                Map<Actor<? extends Resolver<?>>, Answer> copiedResolution = new HashMap<>(answers);
-                copiedResolution.put(producer, answer);
-                return new Answer.Resolution(copiedResolution);
-            }
-
-            public void update(Map<Actor<? extends Resolver<?>>, Answer> newResolutions) {
-                assert answers.keySet().stream().noneMatch(key -> answers.containsKey(key)) : "Cannot overwrite any resolutions during an update";
-                Map<Actor<? extends Resolver<?>>, Answer> copiedResolutinos = new HashMap<>(answers);
-                copiedResolutinos.putAll(newResolutions);
-                this.answers = copiedResolutinos;
-            }
-
-            public void replace(Map<Actor<? extends Resolver<?>>, Answer> newResolutions) {
-                this.answers = map(newResolutions);
-            }
-
-            public Map<Actor<? extends Resolver<?>>, Answer> answers() {
-                return this.answers;
-            }
-
-            @Override
-            public String toString() {
-                return "Resolutions{" + "answers=" + answers + '}';
-            }
-        }
     }
 
     class Exhausted implements Response {
@@ -153,4 +114,5 @@ public interface Response {
                     '}';
         }
     }
+
 }

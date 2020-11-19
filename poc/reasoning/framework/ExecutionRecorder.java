@@ -1,8 +1,9 @@
 package grakn.common.poc.reasoning.framework;
 
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.framework.resolver.Resolver;
-import grakn.common.poc.reasoning.framework.resolver.Response;
+import grakn.common.poc.reasoning.framework.execution.Derivations;
+import grakn.common.poc.reasoning.framework.execution.ExecutionActor;
+import grakn.common.poc.reasoning.framework.execution.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,12 +14,12 @@ import java.util.Objects;
 
 import static grakn.common.collection.Collections.map;
 
-public class ResolutionTree extends Actor.State<ResolutionTree> {
-    private static final Logger LOG = LoggerFactory.getLogger(ResolutionTree.class);
+public class ExecutionRecorder extends Actor.State<ExecutionRecorder> {
+    private static final Logger LOG = LoggerFactory.getLogger(ExecutionRecorder.class);
 
     Map<AnswerIndex, Response.Answer> answers;
 
-    public ResolutionTree(final Actor<ResolutionTree> self) {
+    public ExecutionRecorder(final Actor<ExecutionRecorder> self) {
         super(self);
         answers = new HashMap<>();
     }
@@ -28,32 +29,32 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
         LOG.error("Actor exception", e);
     }
 
-    public void grow(Response.Answer answer) {
+    public void record(Response.Answer answer) {
         merge(answer);
     }
 
     /**
-     * Recursively merge resolution tree nodes into the existing resolution nodes that are recorded in the
-     * answer index. Always keep the pre-existing resolution node, and merge the new ones into the existing node.
+     * Recursively merge derivation tree nodes into the existing derivation nodes that are recorded in the
+     * answer index. Always keep the pre-existing derivation node, and merge the new ones into the existing node.
      */
     private Response.Answer merge(Response.Answer newAnswer) {
 
-        Response.Answer.Resolution newResolution = newAnswer.resolutions();
-        Map<Actor<? extends Resolver<?>>, Response.Answer> subAnswers = newResolution.answers();
+        Derivations newDerivations = newAnswer.derivations();
+        Map<Actor<? extends ExecutionActor<?>>, Response.Answer> subAnswers = newDerivations.answers();
 
-        Map<Actor<? extends Resolver<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
-        for (Actor<? extends Resolver<?>> key : subAnswers.keySet()) {
+        Map<Actor<? extends ExecutionActor<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
+        for (Actor<? extends ExecutionActor<?>> key : subAnswers.keySet()) {
             Response.Answer subAnswer = subAnswers.get(key);
             Response.Answer mergedSubAnswer = merge(subAnswer);
             mergedSubAnswers.put(key, mergedSubAnswer);
         }
-        newResolution.replace(mergedSubAnswers);
+        newDerivations.replace(mergedSubAnswers);
 
         AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.sourceRequest().receiver(), newAnswer.conceptMap());
         if (answers.containsKey(newAnswerIndex)) {
             Response.Answer existingAnswer = answers.get(newAnswerIndex);
-            Response.Answer.Resolution existingResolution = existingAnswer.resolutions();
-            existingResolution.update(newResolution.answers());
+            Derivations existingDerivations = existingAnswer.derivations();
+            existingDerivations.update(newDerivations.answers());
             return existingAnswer;
         } else {
             answers.put(newAnswerIndex, newAnswer);
@@ -62,10 +63,10 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
     }
 
     static class AnswerIndex {
-        private final Actor<? extends Resolver<?>> producer;
+        private final Actor<? extends ExecutionActor<?>> producer;
         private final List<Long> conceptMap;
 
-        public AnswerIndex(final Actor<? extends Resolver<?>> producer, final List<Long> conceptMap) {
+        public AnswerIndex(final Actor<? extends ExecutionActor<?>> producer, final List<Long> conceptMap) {
             this.producer = producer;
             this.conceptMap = conceptMap;
         }

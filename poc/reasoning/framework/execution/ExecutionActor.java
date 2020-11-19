@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning.framework.resolver;
+package grakn.common.poc.reasoning.framework.execution;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
@@ -13,8 +13,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import static grakn.common.collection.Collections.map;
 
-public abstract class Resolver<T extends Resolver<T>> extends Actor.State<T> {
-    private static final Logger LOG = LoggerFactory.getLogger(Resolver.class);
+public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.State<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(ExecutionActor.class);
 
     protected String name;
     private boolean isInitialised;
@@ -23,11 +23,11 @@ public abstract class Resolver<T extends Resolver<T>> extends Actor.State<T> {
     private final Map<Request, ResponseProducer> responseProducers;
     private final Map<Request, Request> requestRouter;
 
-    public Resolver(Actor<T> self, String name) {
+    public ExecutionActor(Actor<T> self, String name) {
         this(self, name, null);
     }
 
-    public Resolver(Actor<T> self, String name, @Nullable LinkedBlockingQueue<Response> responses) {
+    public ExecutionActor(Actor<T> self, String name, @Nullable LinkedBlockingQueue<Response> responses) {
         super(self);
         this.name = name;
         isInitialised = false;
@@ -103,13 +103,13 @@ public abstract class Resolver<T extends Resolver<T>> extends Actor.State<T> {
         LOG.debug("{} : Sending a new Request in order to request for an answer from downstream: {}", name, request);
         // TODO we may overwrite if multiple identical requests are sent, when to clean up?
         requestRouter.put(request, fromUpstream);
-        Actor<? extends Resolver<?>> receiver = request.receiver();
+        Actor<? extends ExecutionActor<?>> receiver = request.receiver();
         receiver.tell(actor -> actor.executeReceiveRequest(request, registry));
     }
 
     private void respondToUpstream(Response response, Registry registry) {
         LOG.debug("{}: Sending a new Response to respond with an answer to upstream: {}", name, response);
-        Actor<? extends Resolver<?>> receiver = response.sourceRequest().sender();
+        Actor<? extends ExecutionActor<?>> receiver = response.sourceRequest().sender();
         if (receiver == null) {
             assert responses != null : this + ": can't return answers because the user answers queue is null";
             LOG.debug("{}: Writing a new Response to output queue", name);
