@@ -3,10 +3,12 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.framework.ResolutionTree;
+import grakn.common.poc.reasoning.framework.resolver.Request;
+import grakn.common.poc.reasoning.framework.resolver.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
-import grakn.common.poc.reasoning.framework.Resolver;
+import grakn.common.poc.reasoning.framework.resolver.Resolver;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.ResponseProducer;
+import grakn.common.poc.reasoning.framework.resolver.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +31,7 @@ public class Concludable extends Resolver<Concludable> {
     private final List<List<Long>> rules;
     private final Map<Actor<Rule>, List<Long>> ruleActorSources;
     private final Set<RuleTrigger> triggered;
-    private Actor<ResolutionTree> recorder;
+    private Actor<ResolutionTree> resolutionTree;
 
     public Concludable(Actor<Concludable> self, Long traversalPattern, List<List<Long>> rules, long traversalSize) {
         super(self, Concludable.class.getSimpleName() + "(pattern: " + traversalPattern + ")");
@@ -67,7 +69,7 @@ public class Concludable extends Resolver<Concludable> {
             Response.Answer.Resolution resolution = new Response.Answer.Resolution(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
             Response.Answer deduplicated = new Response.Answer(fromUpstream, fromDownstream.conceptMap(), fromUpstream.unifiers(),
                     traversalPattern.toString(), resolution);
-            recorder.tell(actor -> actor.grow(deduplicated));
+            resolutionTree.tell(actor -> actor.grow(deduplicated));
 
             return produceMessage(fromUpstream, responseProducer);
         }
@@ -94,7 +96,7 @@ public class Concludable extends Resolver<Concludable> {
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
-        recorder = registry.executionRecorder();
+        resolutionTree = registry.executionRecorder();
         for (List<Long> rule : rules) {
             Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> Actor.create(self().eventLoopGroup(), actor -> new Rule(actor, pattern, 1L, 0L)));
             ruleActorSources.put(ruleActor, rule);

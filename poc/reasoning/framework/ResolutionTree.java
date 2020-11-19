@@ -1,6 +1,8 @@
 package grakn.common.poc.reasoning.framework;
 
 import grakn.common.concurrent.actor.Actor;
+import grakn.common.poc.reasoning.framework.resolver.Resolver;
+import grakn.common.poc.reasoning.framework.resolver.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +16,7 @@ import static grakn.common.collection.Collections.map;
 public class ResolutionTree extends Actor.State<ResolutionTree> {
     private static final Logger LOG = LoggerFactory.getLogger(ResolutionTree.class);
 
-    Map<AnswerIndex, Resolver.Response.Answer> answers;
+    Map<AnswerIndex, Response.Answer> answers;
 
     public ResolutionTree(final Actor<ResolutionTree> self) {
         super(self);
@@ -26,7 +28,7 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
         LOG.error("Actor exception", e);
     }
 
-    public void grow(Resolver.Response.Answer answer) {
+    public void grow(Response.Answer answer) {
         merge(answer);
     }
 
@@ -34,23 +36,23 @@ public class ResolutionTree extends Actor.State<ResolutionTree> {
      * Recursively merge resolution tree nodes into the existing resolution nodes that are recorded in the
      * answer index. Always keep the pre-existing resolution node, and merge the new ones into the existing node.
      */
-    private Resolver.Response.Answer merge(Resolver.Response.Answer newAnswer) {
+    private Response.Answer merge(Response.Answer newAnswer) {
 
-        Resolver.Response.Answer.Resolution newResolution = newAnswer.resolutions();
-        Map<Actor<? extends Resolver<?>>, Resolver.Response.Answer> subAnswers = newResolution.answers();
+        Response.Answer.Resolution newResolution = newAnswer.resolutions();
+        Map<Actor<? extends Resolver<?>>, Response.Answer> subAnswers = newResolution.answers();
 
-        Map<Actor<? extends Resolver<?>>, Resolver.Response.Answer> mergedSubAnswers = new HashMap<>();
+        Map<Actor<? extends Resolver<?>>, Response.Answer> mergedSubAnswers = new HashMap<>();
         for (Actor<? extends Resolver<?>> key : subAnswers.keySet()) {
-            Resolver.Response.Answer subAnswer = subAnswers.get(key);
-            Resolver.Response.Answer mergedSubAnswer = merge(subAnswer);
+            Response.Answer subAnswer = subAnswers.get(key);
+            Response.Answer mergedSubAnswer = merge(subAnswer);
             mergedSubAnswers.put(key, mergedSubAnswer);
         }
         newResolution.replace(mergedSubAnswers);
 
         AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.sourceRequest().receiver(), newAnswer.conceptMap());
         if (answers.containsKey(newAnswerIndex)) {
-            Resolver.Response.Answer existingAnswer = answers.get(newAnswerIndex);
-            Resolver.Response.Answer.Resolution existingResolution = existingAnswer.resolutions();
+            Response.Answer existingAnswer = answers.get(newAnswerIndex);
+            Response.Answer.Resolution existingResolution = existingAnswer.resolutions();
             existingResolution.update(newResolution.answers());
             return existingAnswer;
         } else {

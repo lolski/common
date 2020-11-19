@@ -3,10 +3,12 @@ package grakn.common.poc.reasoning;
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.framework.ResolutionTree;
+import grakn.common.poc.reasoning.framework.resolver.Request;
+import grakn.common.poc.reasoning.framework.resolver.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
-import grakn.common.poc.reasoning.framework.Resolver;
+import grakn.common.poc.reasoning.framework.resolver.Resolver;
 import grakn.common.poc.reasoning.framework.Registry;
-import grakn.common.poc.reasoning.framework.ResponseProducer;
+import grakn.common.poc.reasoning.framework.resolver.ResponseProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
