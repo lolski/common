@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning.model;
+package grakn.common.poc.reasoning.framework;
 
 import java.util.HashSet;
 import java.util.Iterator;

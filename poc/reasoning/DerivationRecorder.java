@@ -1,8 +1,8 @@
 package grakn.common.poc.reasoning;
 
 import grakn.common.concurrent.actor.Actor;
-import grakn.common.poc.reasoning.model.ExecutionActor;
-import grakn.common.poc.reasoning.model.Response;
+import grakn.common.poc.reasoning.framework.ExecutionActor;
+import grakn.common.poc.reasoning.framework.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

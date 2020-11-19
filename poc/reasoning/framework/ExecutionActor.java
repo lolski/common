@@ -1,4 +1,4 @@
-package grakn.common.poc.reasoning.model;
+package grakn.common.poc.reasoning.framework;
 
 import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
