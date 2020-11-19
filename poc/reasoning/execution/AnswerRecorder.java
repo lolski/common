@@ -2,7 +2,6 @@ package grakn.common.poc.reasoning.execution;
 
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.execution.framework.Answer;
-import grakn.common.poc.reasoning.execution.framework.ExecutionRecord;
 import grakn.common.poc.reasoning.execution.framework.ExecutionActor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +39,8 @@ public class AnswerRecorder extends Actor.State<AnswerRecorder> {
      * answer index. Always keep the pre-existing derivation node, and merge the new ones into the existing node.
      */
     private Answer merge(Answer newAnswer) {
-        ExecutionRecord newExecutionRecord = newAnswer.executionRecord();
-        Map<Actor<? extends ExecutionActor<?>>, Answer> subAnswers = newExecutionRecord.answers();
+        Answer.Derivation newDerivation = newAnswer.derivation();
+        Map<Actor<? extends ExecutionActor<?>>, Answer> subAnswers = newDerivation.answers();
 
         Map<Actor<? extends ExecutionActor<?>>, Answer> mergedSubAnswers = new HashMap<>();
         for (Actor<? extends ExecutionActor<?>> key : subAnswers.keySet()) {
@@ -49,15 +48,15 @@ public class AnswerRecorder extends Actor.State<AnswerRecorder> {
             Answer mergedSubAnswer = merge(subAnswer);
             mergedSubAnswers.put(key, mergedSubAnswer);
         }
-        newExecutionRecord.replace(mergedSubAnswers);
+        newDerivation.replace(mergedSubAnswers);
 
         int actorIndex = actorIndices.computeIfAbsent(newAnswer.producer(), key -> actorIndices.size());
         LOG.debug("actor index for " + newAnswer.producer() + ": " + actorIndex);
         AnswerIndex newAnswerIndex = new AnswerIndex(actorIndex, newAnswer.conceptMap());
         if (answers.containsKey(newAnswerIndex)) {
             Answer existingAnswer = answers.get(newAnswerIndex);
-            ExecutionRecord existingExecutionRecord = existingAnswer.executionRecord();
-            existingExecutionRecord.update(newExecutionRecord.answers());
+            Answer.Derivation existingDerivation = existingAnswer.derivation();
+            existingDerivation.update(newDerivation.answers());
             return existingAnswer;
         } else {
             answers.put(newAnswerIndex, newAnswer);

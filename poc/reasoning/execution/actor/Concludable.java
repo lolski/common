@@ -4,7 +4,6 @@ import grakn.common.collection.Either;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.execution.AnswerRecorder;
 import grakn.common.poc.reasoning.execution.framework.Answer;
-import grakn.common.poc.reasoning.execution.framework.ExecutionRecord;
 import grakn.common.poc.reasoning.execution.framework.Request;
 import grakn.common.poc.reasoning.execution.framework.Response;
 import grakn.common.poc.reasoning.mock.MockTransaction;
@@ -52,10 +51,6 @@ public class Concludable extends ExecutionActor<Concludable> {
     @Override
     public Either<Request, Response> receiveAnswer(Request fromUpstream, Response.Answer fromDownstream,
                                                    ResponseProducer responseProducer) {
-        Actor<? extends ExecutionActor<?>> ruleSender = fromDownstream.sourceRequest().receiver();
-
-        List<Long> rulePattern = ruleActorSources.get(ruleSender);
-
         // TODO may combine with partial concept maps from the fromUpstream message
 
         LOG.debug("{}: hasProduced: {}", name, fromDownstream.answer().conceptMap());
@@ -63,13 +58,13 @@ public class Concludable extends ExecutionActor<Concludable> {
             responseProducer.recordProduced(fromDownstream.answer().conceptMap());
 
             // update partial derivation provided from upstream to carry derivations sideways
-            ExecutionRecord executionRecord = new ExecutionRecord(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream.answer())));
-            Answer answer = new Answer(fromDownstream.answer().conceptMap(), traversalPattern.toString(), executionRecord, self());
+            Answer.Derivation derivation = new Answer.Derivation(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream.answer())));
+            Answer answer = new Answer(fromDownstream.answer().conceptMap(), traversalPattern.toString(), derivation, self());
 
             return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers()));
         } else {
-            ExecutionRecord executionRecord = new ExecutionRecord(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream.answer())));
-            Answer deduplicated = new Answer(fromDownstream.answer().conceptMap(), traversalPattern.toString(), executionRecord, self());
+            Answer.Derivation derivation = new Answer.Derivation(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream.answer())));
+            Answer deduplicated = new Answer(fromDownstream.answer().conceptMap(), traversalPattern.toString(), derivation, self());
             executionRecorder.tell(actor -> actor.record(deduplicated));
 
             return produceMessage(fromUpstream, responseProducer);
@@ -110,7 +105,7 @@ public class Concludable extends ExecutionActor<Concludable> {
             LOG.debug("{}: hasProduced: {}", name, conceptMap);
             if (!responseProducer.hasProduced(conceptMap)) {
                 responseProducer.recordProduced(conceptMap);
-                Answer answer = new Answer(conceptMap, traversalPattern.toString(), new ExecutionRecord(map()), self());
+                Answer answer = new Answer(conceptMap, traversalPattern.toString(), new Answer.Derivation(map()), self());
                 return Either.second(new Response.Answer(fromUpstream, answer, fromUpstream.unifiers()));
             }
         }
@@ -125,7 +120,7 @@ public class Concludable extends ExecutionActor<Concludable> {
     private void registerDownstreamRules(ResponseProducer responseProducer, Request.Path path, List<Long> partialConceptMap,
                                          List<Object> unifiers) {
         for (Actor<Rule> ruleActor : ruleActorSources.keySet()) {
-            Request toDownstream = new Request(path.append(ruleActor), partialConceptMap, unifiers, ExecutionRecord.EMPTY);
+            Request toDownstream = new Request(path.append(ruleActor), partialConceptMap, unifiers, Answer.Derivation.EMPTY);
             responseProducer.addDownstreamProducer(toDownstream);
         }
     }
