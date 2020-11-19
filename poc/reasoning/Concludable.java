@@ -96,7 +96,7 @@ public class Concludable extends Resolver<Concludable> {
 
     @Override
     protected void initialiseDownstreamActors(Registry registry) {
-        resolutionTree = registry.executionRecorder();
+        resolutionTree = registry.resolutionTree();
         for (List<Long> rule : rules) {
             Actor<Rule> ruleActor = registry.registerRule(rule, pattern -> Actor.create(self().eventLoopGroup(), actor -> new Rule(actor, pattern, 1L, 0L)));
             ruleActorSources.put(ruleActor, rule);

@@ -3,7 +3,7 @@ package grakn.common.poc.reasoning.test;
 import grakn.common.concurrent.actor.Actor;
 import grakn.common.concurrent.actor.eventloop.EventLoopGroup;
 import grakn.common.poc.reasoning.Concludable;
-import grakn.common.poc.reasoning.Conjunction;
+import grakn.common.poc.reasoning.Root;
 import grakn.common.poc.reasoning.Rule;
 import grakn.common.poc.reasoning.framework.Registry;
 import grakn.common.poc.reasoning.framework.resolver.Request;
@@ -30,7 +30,7 @@ public class ReasoningTest {
 
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 5L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, -10L, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, -10L, responses, elg);
 
         assertResponsesSync(conjunction, atomicTraversalSize + conjunctionTraversalSize, responses, registry);
     }
@@ -51,7 +51,7 @@ public class ReasoningTest {
 
         List<Long> conjunctionPattern = list(atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize,0L,  responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize,0L,  responses, elg);
 
         assertResponses(conjunction, conjunctionTraversalSize + (atomic2TraversalSize * atomic1TraversalSize), responses, registry);
     }
@@ -72,7 +72,7 @@ public class ReasoningTest {
 
         List<Long> conjunctionPattern = list(atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize,0L,  responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize,0L,  responses, elg);
 
         assertResponses(conjunction, conjunctionTraversalSize + (atomic1TraversalSize * atomic2TraversalSize), responses, registry);
     }
@@ -99,7 +99,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomic2Pattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize;
         assertResponses(conjunction, answerCount, responses, registry);
@@ -131,7 +131,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + (atomic3TraversalSize * (atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize));
         assertResponses(conjunction, answerCount, responses, registry);
@@ -158,7 +158,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomic3Pattern, atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + (atomic3TraversalSize * atomic2TraversalSize * atomic1TraversalSize);
         assertResponses(conjunction, answerCount, responses, registry);
@@ -193,7 +193,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomic5Pattern, atomic4Pattern, atomic3Pattern, atomic2Pattern, atomic1Pattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + (atomic5TraversalSize * atomic4TraversalSize * atomic3TraversalSize * atomic2TraversalSize * atomic1TraversalSize);
         assertResponses(conjunction, answerCount, responses, registry);
@@ -219,7 +219,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         conjunction.tell(actor ->
                 actor.executeReceiveRequest(
@@ -253,7 +253,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = 0L;
         long conjunctionTraversalOffset = 0L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + atomic1TraversalSize + ruleTraversalSize + atomic1TraversalSize;
         assertResponses(conjunction, answerCount, responses, registry);
@@ -274,7 +274,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomicPattern);
         long conjunctionTraversalSize = traversalSize;
         long conjunctionTraversalOffset = 1L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = traversalSize;
         assertResponses(conjunction, answerCount, responses, registry);
@@ -315,7 +315,7 @@ public class ReasoningTest {
         List<Long> conjunctionPattern = list(atomic2Pattern);
         long conjunctionTraversalSize = 1L;
         long conjunctionTraversalOffset = -10L;
-        Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
+        Actor<Root> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + atomic2TraversalSize + ruleTraversalSize + atomic1TraversalSize;
 
@@ -336,15 +336,15 @@ public class ReasoningTest {
         registry.registerConcludable(pattern, p -> Actor.create(elg, self -> new Concludable(self, p, rules, traversalSize)));
     }
 
-    private Actor<Conjunction> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<Response> responses, EventLoopGroup elg) {
-        return Actor.create(elg, self -> new Conjunction(self, pattern, traversalSize, traversalOffset, responses));
+    private Actor<Root> registerConjunction(List<Long> pattern, long traversalSize, long traversalOffset, LinkedBlockingQueue<Response> responses, EventLoopGroup elg) {
+        return Actor.create(elg, self -> new Root(self, pattern, traversalSize, traversalOffset, responses));
     }
 
     private void registerRule(List<Long> pattern, long traversalSize, long traversalOffset, Registry registry, EventLoopGroup elg) {
         registry.registerRule(pattern, p -> Actor.create(elg, self -> new Rule(self, p, traversalSize, traversalOffset)));
     }
 
-    private void assertResponses(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
+    private void assertResponses(Actor<Root> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number of traversal answers, plus one expected Exhausted (-1 answer)
         for (int i = 0; i < n; i++) {
@@ -366,7 +366,7 @@ public class ReasoningTest {
         assertTrue(responses.isEmpty());
     }
 
-    private void assertResponsesSync(Actor<Conjunction> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
+    private void assertResponsesSync(Actor<Root> conjunction, long answerCount, LinkedBlockingQueue<Response> responses, Registry registry) throws InterruptedException {
         long startTime = System.currentTimeMillis();
         long n = answerCount + 1; //total number answers, plus one expected DONE (-1 answer)
         for (int i = 0; i < n; i++) {
