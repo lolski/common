@@ -66,7 +66,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
                 Response.Answer answer = new Response.Answer(fromUpstream, conceptMap, fromUpstream.unifiers(),
                         conjunction.toString(), derivations);
                 if (fromUpstream.sender() == null) {
-                    explanationRecorder.tell(actor -> actor.recordTree(self(), conceptMap, answer));
+                    explanationRecorder.tell(actor -> actor.recordTree(answer));
                 }
                 return Either.second(answer);
             } else {
@@ -139,7 +139,7 @@ public class AbstractConjunction<T extends AbstractConjunction<T>> extends Execu
 
     @Override
     protected void exception(Exception e) {
-        LOG.error(e.toString());
+        LOG.error("Actor exception", e);
         // TODO, once integrated into the larger flow of executing queries, kill the actors and report and exception to root
     }
 }

@@ -33,6 +33,8 @@ public abstract class ExecutionActor<T extends ExecutionActor<T>> extends Actor.
         requestRouter = new HashMap<>();
     }
 
+    public String name() { return name; }
+
     protected abstract ResponseProducer createResponseProducer(Request fromUpstream);
 
     protected abstract void initialiseDownstreamActors(Registry registry);

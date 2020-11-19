@@ -69,7 +69,7 @@ public class Concludable extends ExecutionActor<Concludable> {
             Derivations derivations = new Derivations(map(pair(fromDownstream.sourceRequest().receiver(), fromDownstream)));
             Response.Answer deduplicated = new Response.Answer(fromUpstream, fromDownstream.partialAnswer(), fromUpstream.unifiers(),
                     traversalPattern.toString(), derivations);
-            recorder.tell(actor -> actor.recordTree(self(), deduplicated.partialAnswer(), deduplicated));
+            recorder.tell(actor -> actor.recordTree(deduplicated));
 
             return produceMessage(fromUpstream, responseProducer);
         }
@@ -131,7 +131,7 @@ public class Concludable extends ExecutionActor<Concludable> {
 
     @Override
     protected void exception(Exception e) {
-        LOG.error(e.toString());
+        LOG.error("Actor exception", e);
         // TODO, once integrated into the larger flow of executing queries, kill the actors and report and exception to root
     }
 

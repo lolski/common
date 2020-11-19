@@ -171,23 +171,23 @@ public class ReasoningTest {
         Registry registry = new Registry(elg);
 
         long atomic1Pattern = 2L;
-        long atomic1TraversalSize = 10L;
+        long atomic1TraversalSize = 20L;
         registerAtomic(atomic1Pattern, list(), atomic1TraversalSize, registry, elg);
 
         long atomic2Pattern = 20L;
-        long atomic2TraversalSize = 10L;
+        long atomic2TraversalSize = 20L;
         registerAtomic(atomic2Pattern, list(), atomic2TraversalSize, registry, elg);
 
         long atomic3Pattern = 200L;
-        long atomic3TraversalSize = 10L;
+        long atomic3TraversalSize = 20L;
         registerAtomic(atomic3Pattern, list(), atomic3TraversalSize, registry, elg);
 
         long atomic4Pattern = 2000L;
-        long atomic4TraversalSize = 10L;
+        long atomic4TraversalSize = 20L;
         registerAtomic(atomic4Pattern, list(), atomic4TraversalSize, registry, elg);
 
         long atomic5Pattern = 20000L;
-        long atomic5TraversalSize = 10L;
+        long atomic5TraversalSize = 20L;
         registerAtomic(atomic5Pattern, list(), atomic5TraversalSize, registry, elg);
 
         List<Long> conjunctionPattern = list(atomic5Pattern, atomic4Pattern, atomic3Pattern, atomic2Pattern, atomic1Pattern);
@@ -196,6 +196,7 @@ public class ReasoningTest {
         Actor<Conjunction> conjunction = registerConjunction(conjunctionPattern, conjunctionTraversalSize, conjunctionTraversalOffset, responses, elg);
 
         long answerCount = conjunctionTraversalSize + (atomic5TraversalSize * atomic4TraversalSize * atomic3TraversalSize * atomic2TraversalSize * atomic1TraversalSize);
+        System.out.println(answerCount);
         assertResponses(conjunction, answerCount, responses, registry);
     }
 
