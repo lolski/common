@@ -4,7 +4,6 @@ import grakn.common.concurrent.actor.Actor;
 import grakn.common.poc.reasoning.execution.framework.Answer;
 import grakn.common.poc.reasoning.execution.framework.ExecutionRecord;
 import grakn.common.poc.reasoning.execution.framework.ExecutionActor;
-import grakn.common.poc.reasoning.execution.framework.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,11 +17,13 @@ import static grakn.common.collection.Collections.map;
 public class AnswerRecorder extends Actor.State<AnswerRecorder> {
     private static final Logger LOG = LoggerFactory.getLogger(AnswerRecorder.class);
 
+    Map<Actor<? extends ExecutionActor<?>>, Integer> actorIndices;
     Map<AnswerIndex, Answer> answers;
 
     public AnswerRecorder(final Actor<AnswerRecorder> self) {
         super(self);
         answers = new HashMap<>();
+        actorIndices = new HashMap<>();
     }
 
     @Override
@@ -39,7 +40,6 @@ public class AnswerRecorder extends Actor.State<AnswerRecorder> {
      * answer index. Always keep the pre-existing derivation node, and merge the new ones into the existing node.
      */
     private Answer merge(Answer newAnswer) {
-
         ExecutionRecord newExecutionRecord = newAnswer.executionRecord();
         Map<Actor<? extends ExecutionActor<?>>, Answer> subAnswers = newExecutionRecord.answers();
 
@@ -51,7 +51,9 @@ public class AnswerRecorder extends Actor.State<AnswerRecorder> {
         }
         newExecutionRecord.replace(mergedSubAnswers);
 
-        AnswerIndex newAnswerIndex = new AnswerIndex(newAnswer.producer(), newAnswer.conceptMap());
+        int actorIndex = actorIndices.computeIfAbsent(newAnswer.producer(), key -> actorIndices.size());
+        LOG.debug("actor index for " + newAnswer.producer() + ": " + actorIndex);
+        AnswerIndex newAnswerIndex = new AnswerIndex(actorIndex, newAnswer.conceptMap());
         if (answers.containsKey(newAnswerIndex)) {
             Answer existingAnswer = answers.get(newAnswerIndex);
             ExecutionRecord existingExecutionRecord = existingAnswer.executionRecord();
@@ -64,35 +66,34 @@ public class AnswerRecorder extends Actor.State<AnswerRecorder> {
     }
 
     static class AnswerIndex {
-        private final Actor<? extends ExecutionActor<?>> producer;
+        private final int actorIndex;
         private final List<Long> conceptMap;
 
-        public AnswerIndex(final Actor<? extends ExecutionActor<?>> producer, final List<Long> conceptMap) {
-            this.producer = producer;
+        public AnswerIndex(int actorIndex, final List<Long> conceptMap) {
+            this.actorIndex = actorIndex;
             this.conceptMap = conceptMap;
         }
 
         @Override
-        public String toString() {
-            return "AnswerIndex{" +
-                    "producer=" + producer.state.name() +
-                    ", conceptMap=" + conceptMap +
-                    '}';
-        }
-
-        @Override
-        public boolean equals(final Object o) {
+        public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            final AnswerIndex that = (AnswerIndex) o;
-            return Objects.equals(producer, that.producer) &&
+            AnswerIndex that = (AnswerIndex) o;
+            return actorIndex == that.actorIndex &&
                     Objects.equals(conceptMap, that.conceptMap);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(producer, conceptMap);
+            return Objects.hash(actorIndex, conceptMap);
+        }
+
+        @Override
+        public String toString() {
+            return "AnswerIndex{" +
+                    "actorIndex=" + actorIndex +
+                    ", conceptMap=" + conceptMap +
+                    '}';
         }
     }
-
 }
