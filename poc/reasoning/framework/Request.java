@@ -14,16 +14,16 @@ public class Request {
     private final Path path;
     private final List<Long> partialConceptMap;
     private final List<Object> unifiers;
-    private final Derivations partialDerivations;
+    private final Resolutions partialResolutions;
 
     public Request(Path path,
                    List<Long> partialConceptMap,
                    List<Object> unifiers,
-                   Derivations partialDerivations) {
+                   Resolutions partialResolutions) {
         this.path = path;
         this.partialConceptMap = partialConceptMap;
         this.unifiers = unifiers;
-        this.partialDerivations = partialDerivations;
+        this.partialResolutions = partialResolutions;
     }
 
     public Path path() {
@@ -31,14 +31,14 @@ public class Request {
     }
 
     @Nullable
-    public Actor<? extends Execution<?>> sender() {
+    public Actor<? extends Resolver<?>> sender() {
         if (path.path.size() < 2) {
             return null;
         }
         return path.path.get(path.path.size() - 2);
     }
 
-    public Actor<? extends Execution<?>> receiver() {
+    public Actor<? extends Resolver<?>> receiver() {
         return path.path.get(path.path.size() - 1);
     }
 
@@ -70,24 +70,24 @@ public class Request {
         return "Req(send=" + (sender() == null ? "<none>" : sender().state.name) + ", pAns=" + partialConceptMap + ")";
     }
 
-    public Derivations partialDerivations() {
-        return partialDerivations;
+    public Resolutions partialDerivations() {
+        return partialResolutions;
     }
 
     public static class Path {
-        final List<Actor<? extends Execution<?>>> path;
+        final List<Actor<? extends Resolver<?>>> path;
 
-        public Path(Actor<? extends Execution<?>> sender) {
+        public Path(Actor<? extends Resolver<?>> sender) {
             this(list(sender));
         }
 
-        private Path(List<Actor<? extends Execution<?>>> path) {
+        private Path(List<Actor<? extends Resolver<?>>> path) {
             assert !path.isEmpty() : "Path cannot be empty";
             this.path = path;
         }
 
-        public Path append(Actor<? extends Execution<?>> actor) {
-            List<Actor<? extends Execution<?>>> appended = new ArrayList<>(path);
+        public Path append(Actor<? extends Resolver<?>> actor) {
+            List<Actor<? extends Resolver<?>>> appended = new ArrayList<>(path);
             appended.add(actor);
             return new Path(appended);
         }
