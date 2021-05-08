@@ -18,7 +18,7 @@
 
 package grakn.common.test.server;
 
-import grakn.common.collection.Pair;
+import grakn.common.collection.Triple;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,21 +28,21 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static grakn.common.collection.Collections.list;
-import static grakn.common.collection.Collections.pair;
+import static grakn.common.collection.Collections.triple;
 
 public class GraknClusterRunner extends GraknRunner {
 
-    private final Pair<Integer, Integer> ports;
-    private final List<Pair<Integer, Integer>> peerPorts;
+    private final Triple<Integer, Integer, Integer> ports;
+    private final List<Triple<Integer, Integer, Integer>> peerPorts;
 
-    public GraknClusterRunner(Pair<Integer, Integer> ports, List<Pair<Integer, Integer>> peerPorts) throws InterruptedException, TimeoutException, IOException {
+    public GraknClusterRunner(Triple<Integer, Integer, Integer> ports, List<Triple<Integer, Integer, Integer>> peerPorts) throws InterruptedException, TimeoutException, IOException {
         super();
         this.ports = ports;
         this.peerPorts = peerPorts;
     }
 
     public GraknClusterRunner(Integer port) throws InterruptedException, TimeoutException, IOException {
-        this(pair(port, port + 1), list(pair(port, port + 1)));
+        this(triple(port, port + 1, port + 2), list(triple(port, port + 1, port + 2)));
     }
 
     public GraknClusterRunner() throws InterruptedException, TimeoutException, IOException {
@@ -75,7 +75,7 @@ public class GraknClusterRunner extends GraknRunner {
         return command;
     }
 
-    private String getAddressString(Pair<Integer, Integer> ports) {
-        return "127.0.0.1" + ":" + ports.first() + ":" + ports.second();
+    private String getAddressString(Triple<Integer, Integer, Integer> ports) {
+        return "127.0.0.1" + ":" + ports.first() + ":" + ports.second() + ":" + ports.third();
     }
 }
