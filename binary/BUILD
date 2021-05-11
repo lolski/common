@@ -17,13 +17,13 @@
 #
 
 load("@vaticle_bazel_distribution//apt:rules.bzl", "assemble_apt", "deploy_apt")
-load("@vaticle_bazel_distribution//common:rules.bzl", "assemble_targz")
+load("@vaticle_bazel_distribution//common:rules.bzl", "assemble_targz", "assemble_zip")
 load("@vaticle_dependencies//distribution:deployment.bzl", "deployment")
 load("@vaticle_dependencies//tool/checkstyle:rules.bzl", "checkstyle_test")
 
 exports_files(["typedb", "typedb.bat", "typedb.service"])
 
-assemble_targz(
+assemble_zip(
     name = "assemble-bash-targz",
     additional_files = {
         "//binary:typedb": 'typedb',
