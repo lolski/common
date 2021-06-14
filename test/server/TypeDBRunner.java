@@ -117,6 +117,12 @@ public abstract class TypeDBRunner extends Runner {
             try {
                 System.out.println(address() + ": stopping...");
                 serverProcess.getProcess().destroyForcibly();
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                if (serverProcess.getProcess().isAlive()) throw new RuntimeException(address() + ": unable to  stop the server");
                 System.out.println(address() + ": stopped.");
             } catch (Exception e) {
                 printLogs();
